@@ -1,16 +1,6 @@
 import yaml
-import uproot
 from pathlib import Path
 from argparse import ArgumentParser
-
-'''
-Test mode:
-    $ fccanalysis run examples/FCCee/tutorials/opens-fccanalyses.py \
-        --test -- --parameters-file file_variables.yaml
-Full analysis:
-    $ fccanalysis run examples/FCCee/tutorials/opens-fccanalyses.py \
-        -- --parameters-file file_variables.yaml
-'''
 
 # Define the operations on the dataframe
 class Analysis:
@@ -33,7 +23,7 @@ class Analysis:
                 'p8_ee_WW_ecm240': {'fraction': 0.25},
                 'p8_ee_ZH_ecm240': {'fraction': 0.2,}
         }
-        
+        self.output_format = 'rntuple'
         self.input_dir = "/eos/experiment/fcc/hh/tutorials/"\
             "edm4hep_tutorial_data/"
         self.output_dir = "outputs/opens-fccanalyses"
@@ -42,8 +32,6 @@ class Analysis:
         
         # Load variables from the YAML configuration file
         config_file = Path(__file__).parent / self.ana_args.parameters_file
-        #transform to rntuple
-        #then coffea-withedm4hep code
         
         # Store YAML contents as a dictionary
         with open(config_file, "r") as file:
@@ -61,13 +49,5 @@ class Analysis:
         return dframe
     
     # Return the list of branches to save 
-    
-    # TTree
     def output(self):
         return list(self.variables.keys())
-    
-    '''
-    # RNTuple
-    with uproot.recreate("jets_coffea.root") as output_file:
-        output_file.mkrntuple("Events", jet_output)    
-'''
