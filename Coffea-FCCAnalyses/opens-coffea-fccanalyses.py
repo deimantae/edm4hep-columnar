@@ -15,7 +15,6 @@ fname = (
     "events_159112833.root"
 )
 
-
 #fname = "events_159112833.root"
 
 parser = ArgumentParser(description="Additional analysis arguments")
@@ -42,7 +41,7 @@ histograms = {}
 
 for collection_name, variable_list in variables.items():
     if variable_list is None:
-        continue
+        continue # for empty entries
 
     collection = getattr(events, collection_name)
 
@@ -52,12 +51,18 @@ for collection_name, variable_list in variables.items():
             variable_name = variable
             values = getattr(collection, variable_name)
         # Mathematical operation variable
-        else:
+        elif isinstance(variable, dict):
             for variable_name, expression in variable.items():
                 for field in collection.fields:
-                    expression = expression.replace(field,
-                                                    f"collection.{field}")
+                    expression = expression.replace(
+                        field, f"collection.{field}"
+                        )
                 values = eval(expression)
+        # If parameters file format is wrong
+        else:
+            raise TypeError(
+                f"Unsupported variable definition: {variable!r}"
+                )
 
         output_name = f"{collection_name}_{variable_name}"
         variables_output[output_name] = values
