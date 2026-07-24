@@ -1,0 +1,10 @@
+Jet:
+  - pt: "np.sqrt(px*px + py*py)"
+  - mass
+  - charge 
+  - goodnessOfPID
+Muon:
+Electron:
+MET:
+Photon:
+Generator:
