@@ -1,11 +1,9 @@
-jet_pt:
-  line: "ReconstructedParticle::get_pt(Jet)"
-
-jet_mass:
-  line: "ReconstructedParticle::get_mass(Jet)"
-
-jet_charge:
-  line: "ReconstructedParticle::get_charge(Jet)"
-
-jet_goodnessOfPID:
-  line: "Jet.goodnessOfPID"
+variables:
+  Jet:
+    - pt: "np.sqrt(px*px + py*py)"
+    - mass
+    - charge
+    - goodnessOfPID
+  Muon:
+  Electron:
+  Photon:

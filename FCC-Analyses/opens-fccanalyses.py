@@ -35,19 +35,53 @@ class Analysis:
         
         # Store YAML contents as a dictionary
         with open(config_file, "r") as file:
-            self.variables = yaml.safe_load(file)
+            parameters = yaml.safe_load(file)
+            
+        self.variables = parameters["variables"]
+        
+        self.branches = []
+        
+        #Create new branches for every variable defined in the YAML file
+        for collection_name, variable_list in self.variables.items():
+            if variable_list is None:
+                continue # for empty entries
+            for variable in variable_list:
+                
+                # String variable
+                if isinstance(variable, str):
+                    variable_name = variable
+                    expression = f"{collection_name}.{variable_name}"
+                    
+                # Mathematical operation variable
+                elif isinstance(variable, dict):
+                    for variable_name, expression in variable.items():
+                        pass
+                    
+                # If parameters file format is wrong
+                else:
+                    raise TypeError(
+                        f"Unsupported variable definition: {variable!r}"
+                        )
+        
+                branch_name = f"{collection_name}_{variable_name}"
+                self.branches.append((branch_name, expression))
 
     # Return the transformed RDataFrame
     def analyzers(self, dframe):
-        #Create new branches for every variable defined in the YAML file
-        for branch_name, branch_info in self.variables.items():
+            
+        for branch_name, expression in self.branches:
             dframe = dframe.Define(
                 branch_name,
-                branch_info["line"]
+                expression
                 )
         
         return dframe
+        
     
     # Return the list of branches to save 
     def output(self):
-        return list(self.variables.keys())
+        branches = []
+        for branch_name, _ in self.branches:
+            branches.append(branch_name)
+            
+        return branches
