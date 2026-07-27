@@ -3,19 +3,21 @@ import awkward as ak
 import uproot
 import yaml
 import hist
+import importlib.util
 from coffea.nanoevents import FCC, NanoEventsFactory
 from argparse import ArgumentParser
 from coffea import util
 
 # Example FCC winter 2023 sample
-
+'''
 fname = (
     "root://eospublic.cern.ch//eos/experiment/fcc/ee/generation/"
     "DelphesEvents/winter2023/IDEA/wzp6_ee_mumuH_Hbb_ecm240/"
     "events_159112833.root"
 )
+'''
 
-#fname = "events_159112833.root"
+fname = "events_159112833.root"
 
 parser = ArgumentParser(description="Additional analysis arguments")
 parser.add_argument("--parameters-file", required=True, type=str,
@@ -24,7 +26,10 @@ args = parser.parse_args()
 
 # Store YAML contents as a dictionary
 with open(args.parameters_file, "r") as file:
-    variables = yaml.safe_load(file)
+    contents = yaml.safe_load(file)
+    
+selection = contents.get("selection")
+variables = contents.get("variables", {})
 
 # Open the file
 events = NanoEventsFactory.from_root(
@@ -35,7 +40,19 @@ events = NanoEventsFactory.from_root(
     entry_stop=100,
 ).events()
 
-# Collect all indicated variables and create histogram objects
+# Load the selection module and select events
+if selection is not None:
+    spec = importlib.util.spec_from_file_location("selection", selection["file"])
+    selection_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(selection_module)
+    mask = selection_module.select_events(events)
+    
+    print("Selected events:", ak.sum(mask))
+    print("Rejected events:", ak.sum(~mask))
+    
+    events = events[mask]
+
+# Collect all indicated variables
 variables_output = {}
 histograms = {}
 
@@ -46,10 +63,12 @@ for collection_name, variable_list in variables.items():
     collection = getattr(events, collection_name)
 
     for variable in variable_list:
+        
         # String variable
         if isinstance(variable, str):
             variable_name = variable
             values = getattr(collection, variable_name)
+            
         # Mathematical operation variable
         elif isinstance(variable, dict):
             for variable_name, expression in variable.items():
@@ -58,6 +77,7 @@ for collection_name, variable_list in variables.items():
                         field, f"collection.{field}"
                         )
                 values = eval(expression)
+                
         # If parameters file format is wrong
         else:
             raise TypeError(
@@ -66,6 +86,8 @@ for collection_name, variable_list in variables.items():
 
         output_name = f"{collection_name}_{variable_name}"
         variables_output[output_name] = values
+        
+        # Create histogram objects
         
         histogram = (
             hist.Hist.new

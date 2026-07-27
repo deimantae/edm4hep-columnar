@@ -37,7 +37,8 @@ class Analysis:
         with open(config_file, "r") as file:
             parameters = yaml.safe_load(file)
             
-        self.variables = parameters["variables"]
+        self.selection = parameters.get("selection")
+        self.variables = parameters.get("variables", {})
         
         self.branches = []
         
@@ -68,6 +69,11 @@ class Analysis:
 
     # Return the transformed RDataFrame
     def analyzers(self, dframe):
+        
+        # Select events
+        if self.selection is not None:
+            for selection_expression in self.selection:
+                dframe = dframe.Filter(selection_expression)
             
         for branch_name, expression in self.branches:
             dframe = dframe.Define(
@@ -77,7 +83,6 @@ class Analysis:
         
         return dframe
         
-    
     # Return the list of branches to save 
     def output(self):
         branches = []

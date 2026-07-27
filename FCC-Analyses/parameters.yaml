@@ -1,0 +1,12 @@
+selection:
+  - "ROOT::VecOps::Any(sqrt(Jet.momentum.x*Jet.momentum.x + Jet.momentum.y*Jet.momentum.y) > 90)"
+
+variables:
+  Jet:
+    - pt: "sqrt(Jet.momentum.x*Jet.momentum.x + Jet.momentum.y*Jet.momentum.y)"
+    - mass
+    - charge
+    - goodnessOfPID
+  Muon:
+  Electron:
+  Photon:

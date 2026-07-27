@@ -1,9 +1,0 @@
-variables:
-  Jet:
-    - pt: "np.sqrt(px*px + py*py)"
-    - mass
-    - charge
-    - goodnessOfPID
-  Muon:
-  Electron:
-  Photon:
