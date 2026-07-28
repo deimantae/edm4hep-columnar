@@ -1,12 +1,19 @@
 selection:
-  - "ROOT::VecOps::Any(sqrt(Jet.momentum.x*Jet.momentum.x + Jet.momentum.y*Jet.momentum.y) > 90)"
+  # Option 1: use a Python selection function
+  file: event_selection.py
+  function: select_pt
+
+  # Option 2: use an inline C++ filter expression
+  # filter: "ROOT::VecOps::Any(ROOT::VecOps::sqrt(Jet.momentum.x*Jet.momentum.x + Jet.momentum.y*Jet.momentum.y) > 90)"
 
 variables:
   Jet:
-    - pt: "sqrt(Jet.momentum.x*Jet.momentum.x + Jet.momentum.y*Jet.momentum.y)"
+    - pt: "ROOT::VecOps::sqrt(Jet.momentum.x*Jet.momentum.x + Jet.momentum.y*Jet.momentum.y)"
     - mass
     - charge
     - goodnessOfPID
   Muon:
+    - charge
   Electron:
+    - mass
   Photon:

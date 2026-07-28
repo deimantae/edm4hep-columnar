@@ -40,16 +40,78 @@ events = NanoEventsFactory.from_root(
     entry_stop=100,
 ).events()
 
-# Load the selection module and select events
+# Create Muon, Electron and Photon collections from ReconstructedParticles
+muons = events.ReconstructedParticles[events.Muonidx0.index]
+electrons = events.ReconstructedParticles[events.Electronidx0.index]
+photons = events.ReconstructedParticles[events.Photonidx0.index]
+
+events = ak.with_field(events, muons, "Muon")
+events = ak.with_field(events, electrons, "Electron")
+events = ak.with_field(events, photons, "Photon")
+
+# Apply the event selection
 if selection is not None:
-    spec = importlib.util.spec_from_file_location("selection", selection["file"])
-    selection_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(selection_module)
-    mask = selection_module.select_events(events)
-    
+    has_file = "file" in selection
+    has_function = "function" in selection
+    has_filter = "filter" in selection
+
+    # File and function must always be specified together
+    if has_file != has_function:
+        raise ValueError(
+            "'file' and 'function' must be specified together."
+        )
+
+    # Only one selection method may be used
+    if has_file and has_filter:
+        raise ValueError(
+            "Selection must use either 'file' + 'function' "
+            "or 'filter', not both."
+        )
+
+    if not has_file and not has_filter:
+        raise ValueError(
+            "Selection must contain either 'file' + 'function' "
+            "or 'filter'."
+        )
+
+    # Use Python selection function
+    if has_file:
+        spec = importlib.util.spec_from_file_location(
+            "selection",
+            selection["file"],
+        )
+
+        selection_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(selection_module)
+
+        selection_function = getattr(
+            selection_module,
+            selection["function"],
+        )
+
+        mask = selection_function(events)
+
+    # Use an inline Python filter expression
+    else:
+        filter_namespace = {
+            "ak": ak,
+            "np": np,
+        }
+
+        for collection_name in events.fields:
+            filter_namespace[collection_name] = getattr(
+                events,
+                collection_name,
+            )
+
+        mask = eval(
+            selection["filter"],
+            filter_namespace,
+        )
+
     print("Selected events:", ak.sum(mask))
     print("Rejected events:", ak.sum(~mask))
-    
+
     events = events[mask]
 
 # Collect all indicated variables
@@ -71,6 +133,12 @@ for collection_name, variable_list in variables.items():
             
         # Mathematical operation variable
         elif isinstance(variable, dict):
+            if len(variable) != 1:
+                raise ValueError(
+                    "Variable definition must contain only "
+                    f"one expression: {variable!r}"
+                )
+            
             for variable_name, expression in variable.items():
                 for field in collection.fields:
                     expression = expression.replace(
@@ -88,7 +156,6 @@ for collection_name, variable_list in variables.items():
         variables_output[output_name] = values
         
         # Create histogram objects
-        
         histogram = (
             hist.Hist.new
             .Reg(50, 0, 150)

@@ -1,4 +1,5 @@
 import yaml
+import importlib.util
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -39,10 +40,53 @@ class Analysis:
             
         self.selection = parameters.get("selection")
         self.variables = parameters.get("variables", {})
+        self.selection_function = None
+        
+        if self.selection is not None:
+            has_file = "file" in self.selection
+            has_function = "function" in self.selection
+            has_filter = "filter" in self.selection
+
+            # File and function must always be specified together
+            if has_file != has_function:
+                raise ValueError(
+                    "'file' and 'function' must be specified together."
+                )
+
+            # Only one selection method may be used
+            if has_file and has_filter:
+                raise ValueError(
+                    "Selection must use either 'file' + 'function' "
+                    "or 'filter', not both."
+                )
+
+            if not has_file and not has_filter:
+                raise ValueError(
+                    "Selection must contain either 'file' + 'function' "
+                    "or 'filter'."
+                )
+
+            if has_file:
+                selection_file = (
+                    Path(__file__).parent / self.selection["file"]
+                )
+        
+                spec = importlib.util.spec_from_file_location(
+                    "event_selection",
+                    selection_file,
+                )
+
+                selection_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(selection_module)
+
+                self.selection_function = getattr(
+                    selection_module,
+                    self.selection["function"],
+                )
         
         self.branches = []
         
-        #Create new branches for every variable defined in the YAML file
+        # Create new branches for every variable defined in the YAML file
         for collection_name, variable_list in self.variables.items():
             if variable_list is None:
                 continue # for empty entries
@@ -51,10 +95,23 @@ class Analysis:
                 # String variable
                 if isinstance(variable, str):
                     variable_name = variable
-                    expression = f"{collection_name}.{variable_name}"
+
+                    if collection_name in {"Muon", "Electron", "Photon"}:
+                        expression = (
+                            f"FCCAnalyses::ReconstructedParticle::"
+                            f"get_{variable_name}({collection_name})"
+                        )
+                    else:
+                        expression = f"{collection_name}.{variable_name}"    
                     
                 # Mathematical operation variable
                 elif isinstance(variable, dict):
+                    if len(variable) != 1:
+                        raise ValueError(
+                            "Variable definition must contain only"
+                            f" one expression: {variable!r}"
+                        )
+                
                     for variable_name, expression in variable.items():
                         pass
                     
@@ -62,27 +119,50 @@ class Analysis:
                 else:
                     raise TypeError(
                         f"Unsupported variable definition: {variable!r}"
-                        )
-        
+                    )
+                
                 branch_name = f"{collection_name}_{variable_name}"
                 self.branches.append((branch_name, expression))
 
     # Return the transformed RDataFrame
     def analyzers(self, dframe):
         
-        # Select events
-        if self.selection is not None:
-            for selection_expression in self.selection:
-                dframe = dframe.Filter(selection_expression)
-            
-        for branch_name, expression in self.branches:
+        # Create Muon, Electron and Photon collections from ReconstructedParticles
+        if self.variables.get("Muon") is not None:
             dframe = dframe.Define(
-                branch_name,
-                expression
-                )
-        
+                "Muon",
+                "FCCAnalyses::ReconstructedParticle::get("
+                "Muon_objIdx.index, ReconstructedParticles)"
+            )
+    
+        if self.variables.get("Electron") is not None:
+            dframe = dframe.Define(
+                "Electron",
+                "FCCAnalyses::ReconstructedParticle::get("
+                "Electron_objIdx.index, ReconstructedParticles)"
+            )
+    
+        if self.variables.get("Photon") is not None:
+            dframe = dframe.Define(
+                "Photon",
+                "FCCAnalyses::ReconstructedParticle::get("
+                "Photon_objIdx.index, ReconstructedParticles)"
+            )
+            
+        # Apply the event selection
+        if self.selection is not None:
+            # Use Python selection function
+            if self.selection_function is not None:
+                dframe = self.selection_function(dframe)
+            # Use an inline C++ filter expression
+            else:
+                dframe = dframe.Filter(self.selection["filter"])
+    
+        for branch_name, expression in self.branches:
+            dframe = dframe.Define(branch_name, expression)
+    
         return dframe
-        
+    
     # Return the list of branches to save 
     def output(self):
         branches = []
