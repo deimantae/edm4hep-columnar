@@ -1,10 +1,15 @@
 selection:
   # Option 1: use a Python selection function
-  file: event_selection.py
-  function: select_pt
+  script:
+    file_name: event_selection.py
+    function: select_pt
 
   # Option 2: use an inline C++ filter expression
   # filter: "ROOT::VecOps::Any(ROOT::VecOps::sqrt(Jet.momentum.x*Jet.momentum.x + Jet.momentum.y*Jet.momentum.y) > 90)"
+
+additional_fields: 
+  -  file_name: new_collections.py
+     function: particle_collections
 
 variables:
   Jet:

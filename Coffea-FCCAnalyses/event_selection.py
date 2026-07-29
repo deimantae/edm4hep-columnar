@@ -1,6 +1,3 @@
-import awkward as ak
-import numpy as np
-
 """
 Example event selection functions.
 
@@ -9,6 +6,9 @@ a boolean Awkward array with one value per event. Reference the
 function in the YAML configuration.
 """
 
+import awkward as ak
+import numpy as np
+
 def select_pt(events):
     # Example: keep events with at least one jet with pT > 90 GeV
     jet_pt = np.sqrt(
@@ -16,7 +16,6 @@ def select_pt(events):
         events.Jet.py * events.Jet.py
     )
     return ak.any(jet_pt > 90, axis=1)
-
 
 def select_particle_mass(events):
     # Example: keep events with at least one reconstructed particle

@@ -5,7 +5,6 @@ Each function takes an RDataFrame as input and returns the filtered
 RDataFrame. Reference the function in the YAML configuration.
 """
 
-
 def select_pt(dframe):
     # Example: keep events with at least one jet with pT > 90 GeV
     return dframe.Filter(
@@ -13,7 +12,6 @@ def select_pt(dframe):
         "Jet.momentum.x*Jet.momentum.x + "
         "Jet.momentum.y*Jet.momentum.y) > 90)"
     )
-
 
 def select_particle_mass(dframe):
     # Example: keep events with at least one reconstructed particle

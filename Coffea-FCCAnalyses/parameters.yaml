@@ -1,10 +1,15 @@
 selection:
   # Option 1: use a Python selection function
-  file: event_selection.py
-  function: select_pt
+  script:
+    file_name: event_selection.py
+    function: select_pt
 
   # Option 2: use an inline Python filter expression
   # filter: "ak.any(np.sqrt(Jet.px*Jet.px + Jet.py*Jet.py) > 90, axis=1)"
+
+additional_fields: 
+  -  file_name: new_collections.py
+     function: particle_collections
 
 variables:
   Jet:
