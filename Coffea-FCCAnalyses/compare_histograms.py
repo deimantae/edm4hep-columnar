@@ -1,30 +1,22 @@
-import awkward as ak
-import uproot
-import hist
-import mplhep as hep
-from coffea import util
+from argparse import ArgumentParser
+
 import matplotlib.pyplot as plt
+import mplhep as hep
+
+from coffea import util
 from matplotlib.backends.backend_pdf import PdfPages
 
-# Load histogram objects created from the input data
-input_histograms = util.load("input_histograms.coffea")
 
-# Read branches from the output RNTuple
-with uproot.open("output.root") as output_file:
-    rntuple = output_file["Events"]
+# Command-line arguments
+parser = ArgumentParser(description="Compare two histogram files.")
+parser.add_argument("histograms_1", help="First histogram file.")
+parser.add_argument("histograms_2", help="Second histogram file.")
 
-    # Create output histograms
-    output_histograms = {}
+args = parser.parse_args()
 
-    for branch in rntuple.keys():
-        values = rntuple[branch].array()
-
-        output_histograms[branch] = (
-            hist.Hist.new
-            .Reg(50, 0, 150)
-            .Double()
-            .fill(ak.ravel(values))
-        )
+# Load histogram objects
+histograms_1 = util.load(args.histograms_1)
+histograms_2 = util.load(args.histograms_2)
         
 # Plot style
 hep.style.use("ROOT")
@@ -37,9 +29,9 @@ plt.rcParams.update({
 
 # Compare input and output histograms
 with PdfPages("histogram_comparison.pdf") as pdf:
-    for branch in output_histograms:
-        input_hist = input_histograms[branch]
-        output_hist = output_histograms[branch]
+    for branch in histograms_2:
+        histogram_1 = histograms_1[branch]
+        histogram_2 = histograms_2[branch]
         
         fig, (ax, ax_difference) = plt.subplots(
             2,
@@ -50,14 +42,14 @@ with PdfPages("histogram_comparison.pdf") as pdf:
                          "hspace": 0.08}
             )
 
-        input_hist.plot1d(
+        histogram_1.plot1d(
             ax=ax,
             label=r"$h_1$",
             color="navy",
             linewidth=1.5
         )
 
-        output_hist.plot1d(
+        histogram_2.plot1d(
             ax=ax,
             label=r"$h_2$",
             color="lightsteelblue",
@@ -66,7 +58,7 @@ with PdfPages("histogram_comparison.pdf") as pdf:
         )
     
         # Difference panel
-        difference = input_hist.values() - output_hist.values()
+        difference = histogram_1.values() - histogram_2.values()
         
         ax_difference.axhline(
             0,
@@ -76,7 +68,7 @@ with PdfPages("histogram_comparison.pdf") as pdf:
             )
 
         ax_difference.plot(
-            input_hist.axes[0].centers,
+            histogram_1.axes[0].centers,
             difference,
             linestyle="none",
             marker="o",

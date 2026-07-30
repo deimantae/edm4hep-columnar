@@ -35,7 +35,7 @@ additional_fields = contents.get("additional_fields") or []
 # Variables to histogram
 variables = contents.get("variables") or {}
 
-# Open the file
+# Open the EDM4hep file
 events = NanoEventsFactory.from_root(
     {args.input_file: "events"},
     schemaclass=FCC.get_schema(version="pre-edm4hep1"),
@@ -58,32 +58,48 @@ except (ValueError, TypeError, KeyError) as error:
 
 # Collect all indicated variables
 try:
-    variables_output = collect_variables(events, variables)
+    selected_variables = collect_variables(events, variables)
 
 except (ValueError, TypeError, KeyError, AttributeError) as error:
     print(f"Configuration error: {error}")
     sys.exit(1)
 
-# Create histogram objects
-histograms = {}
+# Create histograms from the filtered EDM4hep file
+edm4hep_histograms = {}
 
-for output_name, values in variables_output.items():
-    histogram = (
+for variable_name, values in selected_variables.items():
+    edm4hep_histograms[variable_name] = (
         hist.Hist.new
         .Reg(50, 0, 150)
         .Double()
         .fill(ak.ravel(values))
     )
-
-    histograms[output_name] = histogram
-
-# Combine all calculated variables into one output array
-output_array = ak.zip(variables_output, depth_limit=1)
-util.save(histograms, "input_histograms.coffea")
-print("Saved input histogram objects to input_histograms.coffea")
-
-# Create RNTuple output file
-with uproot.recreate(args.output_file) as output_file:
-    output_file.mkrntuple("Events", output_array)
     
-print(f"Saved output RNTuple to {args.output_file}")
+util.save(edm4hep_histograms, "edm4hep_histograms.coffea")
+print("Saved EDM4hep histogram objects to edm4hep_histograms.coffea")
+    
+# Write filtered variables to RNTuple
+rntuple_array = ak.zip(selected_variables, depth_limit=1)
+
+with uproot.recreate(args.output_file) as output_file:
+    output_file.mkrntuple("Events", rntuple_array)
+    
+print(f"Saved RNTuple to {args.output_file}")   
+
+# Open the RNTuple file
+with uproot.open(args.output_file) as input_file:
+    rntuple_events = input_file["Events"].arrays()
+
+# Create RNTuple histogram objects
+rntuple_histograms = {}
+
+for variable_name in rntuple_events.fields:
+    rntuple_histograms[variable_name] = (
+        hist.Hist.new
+        .Reg(50, 0, 150)
+        .Double()
+        .fill(ak.ravel(rntuple_events[variable_name]))
+    )
+
+util.save(rntuple_histograms, "rntuple_histograms.coffea")
+print("Saved RNTuple histogram objects to rntuple_histograms.coffea")
