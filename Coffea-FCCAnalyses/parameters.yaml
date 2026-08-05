@@ -7,18 +7,80 @@ selection:
   # Option 2: use an inline Python filter expression
   # filter: "ak.any(np.sqrt(Jet.px*Jet.px + Jet.py*Jet.py) > 90, axis=1)"
 
-additional_fields: 
-  -  file_name: new_collections.py
-     function: particle_collections
+additional_fields:
+  - file_name: new_collections.py
+    function: particle_collections
+
+  - file_name: new_collections.py
+    function: missing_energy
+
+  - file_name: new_collections.py
+    function: event_information
 
 variables:
   Jet:
+    - px
+    - py
+    - pz
     - pt: "np.sqrt(px*px + py*py)"
+    - p: "np.sqrt(px*px + py*py + pz*pz)"
+    - theta: "np.arctan2(np.sqrt(px*px + py*py), pz)"
+    - phi: "np.arctan2(py, px)"
+    - energy
     - mass
+    - charge
+
+  Muon:
+    - px
+    - py
+    - pz
+    - pt: "np.sqrt(px*px + py*py)"
+    - p: "np.sqrt(px*px + py*py + pz*pz)"
+    - theta: "np.arctan2(np.sqrt(px*px + py*py), pz)"
+    - phi: "np.arctan2(py, px)"
+    - energy
     - charge
     - goodnessOfPID
-  Muon:
-    - charge
+    - isolation
+    - d0
+    - z0
+    - d0Error
+    - z0Error
+
   Electron:
-    - mass
+    - px
+    - py
+    - pz
+    - pt: "np.sqrt(px*px + py*py)"
+    - p: "np.sqrt(px*px + py*py + pz*pz)"
+    - theta: "np.arctan2(np.sqrt(px*px + py*py), pz)"
+    - phi: "np.arctan2(py, px)"
+    - energy
+    - charge
+    - goodnessOfPID
+    - d0
+    - z0
+    - d0Error
+    - z0Error
+
   Photon:
+    - px
+    - py
+    - pz
+    - pt: "np.sqrt(px*px + py*py)"
+    - p: "np.sqrt(px*px + py*py + pz*pz)"
+    - theta: "np.arctan2(np.sqrt(px*px + py*py), pz)"
+    - phi: "np.arctan2(py, px)"
+    - energy
+    - charge
+
+  MissingEnergy:
+    - px
+    - py
+    - pz
+    - energy
+
+  EventInfo:
+    - event
+    - run
+    - nTrack

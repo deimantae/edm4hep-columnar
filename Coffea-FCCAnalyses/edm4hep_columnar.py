@@ -54,14 +54,14 @@ def configure_analysis(input_file, parameters_file):
         )
     
     events = open_edm4hep(input_file)
-    
+
     try:
         # Add user-defined fields to the events array
         events = add_fields(events, additional_fields)
     
         # Apply the event selection
         events = apply_selection(events, selection)
-    
+        
     except (ValueError, TypeError, KeyError) as error:
         print(f"Configuration error: {error}")
         sys.exit(1)
