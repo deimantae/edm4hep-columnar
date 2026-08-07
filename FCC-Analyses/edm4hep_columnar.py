@@ -6,8 +6,6 @@ from argparse import ArgumentParser
 sys.path.insert(0, str(Path(__file__).parent))
 
 from module_loader import load_function, validate_function_config
-#from analysis_helpers import add_fields, apply_selection, collect_variables
-
 
 # Define the operations on the dataframe
 class Analysis:
@@ -17,27 +15,31 @@ class Analysis:
         # All command line arguments are provided in the `cmdline_arg`
         # dictionary and arguments after "--" are stored under "remaining" key.
         parser = ArgumentParser(
-            description="Additional analysis arguments",
+            description="Run a configurable EDM4hep analysis.",
             usage="Provided after '--'")
-        parser.add_argument("--parameters-file", required=True, type=str,
-                            help="YAML file containing the variables.")
-        self.ana_args, _ = parser.parse_known_args(cmdline_args["remaining"])
+        
+        subparsers = parser.add_subparsers(dest="command", required=True)
 
-        # Run over the full statistics and save it to one output file named
-        # <outputDir>/<process_name>.root
-        '''
-        self.process_list = {
-                'p8_ee_ZZ_ecm240': {'fraction': 0.5}, #  statistics percent
-                'p8_ee_WW_ecm240': {'fraction': 0.25},
-                'p8_ee_ZH_ecm240': {'fraction': 0.2,}
-        }
-        '''
+        # Convert command
+        convert_parser = subparsers.add_parser(
+            "convert",
+            help="Read an EDM4hep file, apply the configured analysis steps "
+            "and write the selected variables to an RNTuple"
+        )
+        convert_parser.add_argument("--parameters-file", required=True,
+                                    type=str, help="YAML file containing the analysis configuration.")  
+
+        # EDM4hep histogram command
+        edm4hep_parser = subparsers.add_parser(
+            "histogram-edm4hep",
+            help="Read an EDM4hep file, apply the configured analysis steps "
+            "and create histograms."
+        )
+        edm4hep_parser.add_argument("--parameters-file", required=True, type=str,
+                            help="YAML file containing the analysis configuration.")
+        
+        self.ana_args, _ = parser.parse_known_args(cmdline_args["remaining"])
         self.output_format = 'rntuple'
-        self.input_dir = "/eos/experiment/fcc/hh/tutorials/"\
-            "edm4hep_tutorial_data/"
-        self.output_dir = "outputs/opens-fccanalyses"
-        self.test_file = "https://fccsw.web.cern.ch/fccsw/analysis/" \
-                         "test-samples/edm4hep099/p8_ee_WW_ecm240_edm4hep.root"
         
         # Load variables from the YAML configuration file
         config_file = Path(__file__).parent / self.ana_args.parameters_file

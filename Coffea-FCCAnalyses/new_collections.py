@@ -97,9 +97,10 @@ def particle_collections(events):
     # Track state covariance matrix (21 elements)
     muon_cov = muon_track_states["covMatrix_21_"]
     electron_cov = electron_track_states["covMatrix_21_"]
-    
+        
     # Add the uncertainties
     # FCCAnalyses uses covariance element 0 for D0 and 9 for Z0
+    # https://github.com/HEP-FCC/FCCAnalyses/blob/master/analyzers/dataframe/src/ReconstructedParticle2Track.cc
     muons = ak.with_field(muons, np.sqrt(muon_cov[:, :, 0]), "d0Error")
     muons = ak.with_field(muons, np.sqrt(muon_cov[:, :, 9]), "z0Error")
     electrons = ak.with_field(electrons,
@@ -112,7 +113,6 @@ def particle_collections(events):
         "Electron": electrons,
         "Photon": photons,
     }
-
 
 # Return missing energy vector, based on reco particles
 def missing_energy(events):
@@ -137,13 +137,16 @@ def missing_energy(events):
         "MissingEnergy": missing,
     }
 
-
 def event_information(events):
+    # The input file used in this example does not contain event number
+    # information, thus an event counter is assigned
     n_events = len(events)
-    
+
     return {
         "EventInfo": ak.zip({
             "event": ak.Array(np.arange(n_events, dtype=np.int64)),
+            # The input file used in this example does not contain run
+            # information, thus a default run number of 1 is assigned
             "run": ak.Array(np.ones(n_events, dtype=np.int32)),
             "nTrack": ak.num(events.EFlowTrack, axis=1),
         })

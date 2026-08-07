@@ -82,6 +82,11 @@ def event_information_expression(_, variable_name):
 
 def particle_collections():
     return {
+        # Track states used to retrieve d0, z0 and their uncertainties.
+        "TrackState": {
+            "define": "_EFlowTrack_trackStates",
+        },
+        
         "Muon": {
             "define": (
                 "FCCAnalyses::ReconstructedParticle::get("
@@ -102,11 +107,6 @@ def particle_collections():
                 "Photon_objIdx.index, ReconstructedParticles)"
             ),
             "expression": reconstructed_particle_expression,
-        },
-        
-        # Track states used to retrieve d0, z0 and their uncertainties.
-        "TrackState": {
-            "define": "_EFlowTrack_trackStates",
         },
     }
 
