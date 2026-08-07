@@ -25,11 +25,13 @@ class Analysis:
 
         # Run over the full statistics and save it to one output file named
         # <outputDir>/<process_name>.root
+        '''
         self.process_list = {
                 'p8_ee_ZZ_ecm240': {'fraction': 0.5}, #  statistics percent
                 'p8_ee_WW_ecm240': {'fraction': 0.25},
                 'p8_ee_ZH_ecm240': {'fraction': 0.2,}
         }
+        '''
         self.output_format = 'rntuple'
         self.input_dir = "/eos/experiment/fcc/hh/tutorials/"\
             "edm4hep_tutorial_data/"
@@ -132,14 +134,15 @@ class Analysis:
     # Return the transformed RDataFrame
     def analyzers(self, dframe):
         
-        # Create additional collections                                
+        # Create additional collections
         for field_name, field_definition in (
             self.additional_field_definitions.items()
         ):
-            dframe = dframe.Define(
-                field_name,
-                field_definition["define"],
-            )
+            if "define" in field_definition:
+                dframe = dframe.Define(
+                    field_name,
+                    field_definition["define"],
+                )
     
         # Apply the event selection
         if self.selection is not None:
