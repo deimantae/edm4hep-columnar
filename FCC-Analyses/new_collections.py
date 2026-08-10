@@ -10,62 +10,70 @@ from pathlib import Path
 
 import ROOT
 
-# Adapted from FCCAnalyses/examples/FCCee/higgs/mass_xsec/functions.h
+# Local C++ helper functions used for variables not provided
+# by FCCAnalyses::PodioSource::ReconstructedParticle
 functions_header = Path(__file__).resolve().parent / "functions.h"
 
 ROOT.gInterpreter.Declare(f'#include "{functions_header}"')
 
-
 # ---------- Helper functions ----------
 
 def reconstructed_particle_expression(collection_name, variable_name):
-    # Some helper functions in FCCAnalyses use different names 
-    helper_aliases = {
-        "energy": "e",
+    # Helpers available through FCCAnalyses::PodioSource::ReconstructedParticle
+    helper_names = {
+        "p": "getP",
+        "pt": "getPt",
+        "energy": "getE",
+        "mass": "getMass",
+        "charge": "getCharge",
+    }
+    
+    # Additional helpers declared in functions.h 
+    declared_names = {
+        "px": "getPx",
+        "py": "getPy",
+        "pz": "getPz",
+        "theta": "getTheta",
+        "phi": "getPhi",
+        "goodnessOfPID": "getGoodnessOfPID",
+        "d0": "getD0",
+        "z0": "getZ0",
+        "d0Error": "getD0Error",
+        "z0Error": "getZ0Error",
     }
 
-    # Variables that require helper functions
     special_expressions = {
         "isolation": (
-            "FCCAnalyses::ZHfunctions::coneIsolation(0.01, 0.5)("
+            "FCCAnalyses::ReconstructedParticleUtils::getIsolation("
             f"{collection_name}, ReconstructedParticles)"
         ),
-        "d0": (
-            "FCCAnalyses::ReconstructedParticle2Track::getRP2TRK_D0("
-            f"{collection_name}, TrackState)"
-        ),
-        "z0": (
-            "FCCAnalyses::ReconstructedParticle2Track::getRP2TRK_Z0("
-            f"{collection_name}, TrackState)"
-        ),
-        "d0Error": (
-            "ROOT::VecOps::sqrt("
-            "FCCAnalyses::ReconstructedParticle2Track::getRP2TRK_D0_cov("
-            f"{collection_name}, TrackState))"
-        ),
-        "z0Error": (
-            "ROOT::VecOps::sqrt("
-            "FCCAnalyses::ReconstructedParticle2Track::getRP2TRK_Z0_cov("
-            f"{collection_name}, TrackState))"
-        ),
     }
-
+    
     if variable_name in special_expressions:
         return special_expressions[variable_name]
 
-    helper_name = helper_aliases.get(variable_name, variable_name)
+    if variable_name in helper_names:
+        return (
+            "ReconstructedParticle::"
+            f"{helper_names[variable_name]}({collection_name})"
+        )
+    
+    if variable_name in declared_names:
+        return (
+            "FCCAnalyses::ReconstructedParticleUtils::"
+            f"{declared_names[variable_name]}({collection_name})"
+        )
 
-    return (
-        "FCCAnalyses::ReconstructedParticle::"
-        f"get_{helper_name}({collection_name})"
+    raise ValueError(
+        f"Unsupported reconstructed particle variable: {variable_name}"
     )
-
+    
 
 def event_information_expression(_, variable_name):
     expressions = {
-        "event": "EventHeader.eventNumber[0]",
-        "run": "EventHeader.runNumber[0]",
-        "weight": "EventHeader.weight[0]",
+        "event": "EventHeader.eventNumber()[0]",
+        "run": "EventHeader.runNumber()[0]",
+        "weight": "EventHeader.weight()[0]",
         "nTrack": "EFlowTrack.size()",
     }
 
@@ -79,52 +87,29 @@ def event_information_expression(_, variable_name):
 
 # ---------- User-defined collections ----------
 
-
+# Muon, Electron and Photon are already provided as input collections
+# by podio::DataSource. Only define how their variables are accessed.
 def particle_collections():
     return {
-        # Track states used to retrieve d0, z0 and their uncertainties.
-        "TrackState": {
-            "define": "_EFlowTrack_trackStates",
-        },
-        
-        "Muon": {
-            "define": (
-                "FCCAnalyses::ReconstructedParticle::get("
-                "Muon_objIdx.index, ReconstructedParticles)"
-            ),
-            "expression": reconstructed_particle_expression,
-        },
-        "Electron": {
-            "define": (
-                "FCCAnalyses::ReconstructedParticle::get("
-                "Electron_objIdx.index, ReconstructedParticles)"
-            ),
-            "expression": reconstructed_particle_expression,
-        },
-        "Photon": {
-            "define": (
-                "FCCAnalyses::ReconstructedParticle::get("
-                "Photon_objIdx.index, ReconstructedParticles)"
-            ),
-            "expression": reconstructed_particle_expression,
-        },
+        "Jet": {"expression": reconstructed_particle_expression},
+        "Muon": {"expression": reconstructed_particle_expression},
+        "Electron": {"expression": reconstructed_particle_expression},
+        "Photon": {"expression": reconstructed_particle_expression},
     }
-
 
 
 def missing_energy():
     return {
-        # Compute the centre-of-mass energy from the incoming beam particles
         "ECM": {
             "define": (
-                "FCCAnalyses::MCParticle::get_e(Particle)[0] + "
-                "FCCAnalyses::MCParticle::get_e(Particle)[1]"
+                "FCCAnalyses::MCParticleUtils::getEnergy(Particle)[0] + "
+                "FCCAnalyses::MCParticleUtils::getEnergy(Particle)[1]"
             ),
         },
         "MissingEnergy": {
             "define": (
-                "FCCAnalyses::ZHfunctions::missingEnergy("
-                "ECM, ReconstructedParticles)"
+                "FCCAnalyses::ReconstructedParticleUtils::"
+                "getMissingEnergy(ECM, ReconstructedParticles)"
             ),
             "expression": reconstructed_particle_expression,
         },

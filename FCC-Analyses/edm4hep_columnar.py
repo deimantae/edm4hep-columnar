@@ -1,169 +1,239 @@
+'''
+Run configurable EDM4hep file reduction, conversion to RNTuple, histogramming 
+and validation commands.
+'''
 import sys
 import yaml
-from pathlib import Path
 from argparse import ArgumentParser
 
-sys.path.insert(0, str(Path(__file__).parent))
+import ROOT
 
-from module_loader import load_function, validate_function_config
+from analysis_helpers import add_fields, apply_selection, collect_variables
+from comparison import compare_histograms
 
-# Define the operations on the dataframe
-class Analysis:
-    
-    def __init__(self, cmdline_args):
-        # Parse additional arguments
-        # All command line arguments are provided in the `cmdline_arg`
-        # dictionary and arguments after "--" are stored under "remaining" key.
-        parser = ArgumentParser(
-            description="Run a configurable EDM4hep analysis.",
-            usage="Provided after '--'")
-        
-        subparsers = parser.add_subparsers(dest="command", required=True)
+# Load FCCAnalyses
+# Adapted from FCCAnalyses/examples/data_source/standalone.py
 
-        # Convert command
-        convert_parser = subparsers.add_parser(
-            "convert",
-            help="Read an EDM4hep file, apply the configured analysis steps "
-            "and write the selected variables to an RNTuple"
+ROOT.gSystem.Load("libFCCAnalyses")
+if ROOT.dummyLoader:
+    print("----> DEBUG: Found FCCAnalyses library.")
+    ROOT.gInterpreter.Declare("using namespace FCCAnalyses::PodioSource;")
+print("----> INFO: Loading analyzers from libFCCAnalyses...")
+
+# Load podio DataSource
+if ROOT.podio.DataSource:
+    print("----> DEBUG: Found Podio ROOT DataSource.")
+
+
+def load_configuration(parameters_file):
+    # Load the analysis configuration from a YAML file
+    # and store its contents as a dictionary
+    with open(parameters_file, "r") as file:
+        contents = yaml.safe_load(file) or {}
+
+    # Optional event selection
+    selection = contents.get("selection")
+
+    # Optional additional fields
+    additional_fields = contents.get("additional_fields") or []
+
+    # Variables to collect
+    variables = contents.get("variables") or {}
+
+    return selection, additional_fields, variables
+
+
+def open_edm4hep(input_file):
+    # Open the EDM4hep ROOT file using podio::DataSource
+    input_list = [input_file]
+
+    print("----> INFO: Loading events through podio::DataSource...")
+
+    try:
+        dframe = ROOT.podio.CreateDataFrame(input_list)
+    except TypeError as excp:
+        print("----> ERROR: Unable to build dataframe!")
+        print(excp)
+        raise
+
+    # TODO: Remove temporary event limit after debugging
+    return dframe.Range(100)
+
+
+def configure_analysis(input_file, parameters_file):
+    # Load and apply optional additional fields and/or event selection
+    selection, additional_fields, variables = (
+        load_configuration(parameters_file)
+    )
+
+    dframe = open_edm4hep(input_file)
+
+    try:
+        # Add user-defined fields to the dataframe
+        dframe, field_definitions = add_fields(
+            dframe,
+            additional_fields,
         )
-        convert_parser.add_argument("--parameters-file", required=True,
-                                    type=str, help="YAML file containing the analysis configuration.")  
 
-        # EDM4hep histogram command
-        edm4hep_parser = subparsers.add_parser(
-            "histogram-edm4hep",
-            help="Read an EDM4hep file, apply the configured analysis steps "
-            "and create histograms."
-        )
-        edm4hep_parser.add_argument("--parameters-file", required=True, type=str,
-                            help="YAML file containing the analysis configuration.")
-        
-        self.ana_args, _ = parser.parse_known_args(cmdline_args["remaining"])
-        self.output_format = 'rntuple'
-        
-        # Load variables from the YAML configuration file
-        config_file = Path(__file__).parent / self.ana_args.parameters_file
-        
-        # Store YAML contents as a dictionary
-        with open(config_file, "r") as file:
-            parameters = yaml.safe_load(file)
-            
-        self.selection = parameters.get("selection")
-        self.selection_function = None
-        
-        if self.selection is not None and "script" in self.selection:
-            validate_function_config(
-                self.selection["script"],
-                "selection.script",
-            )
-        
-            self.selection_function = load_function(
-                Path(__file__).parent /
-                self.selection["script"]["file_name"],
-                self.selection["script"]["function"],
-                "selection.script",
-            )
-                
-        self.additional_fields = parameters.get("additional_fields") or []
-        self.additional_field_definitions = {}
-        
-        self.variables = parameters.get("variables") or {}
-        
-        for field_config in self.additional_fields:
-            validate_function_config(
-                field_config,
-                "additional_fields",
-            )
-        
-            field_function = load_function(
-                Path(__file__).parent / field_config["file_name"],
-                field_config["function"],
-                "additional_fields",
-            )
-        
-            field_definitions = field_function()
-            
-            if not isinstance(field_definitions, dict):
-                raise TypeError(
-                    "Additional field function must return a dictionary."
-                )
-            
-            self.additional_field_definitions.update(field_definitions)
-
-        self.branches = []
-        
-        # Create new branches for every variable defined in the YAML file
-        for collection_name, variable_list in self.variables.items():
-            if variable_list is None:
-                continue # for empty entries
-            for variable in variable_list:
-                
-                # String variable
-                if isinstance(variable, str):
-                    variable_name = variable
-                        
-                    if collection_name in self.additional_field_definitions:
-                        field_definition = self.additional_field_definitions[
-                            collection_name
-                        ]
-                        
-                        expression = field_definition["expression"](
-                            collection_name,
-                            variable_name,
-                        )             
-                    else:
-                        expression = f"{collection_name}.{variable_name}"
-                    
-                # Mathematical operation variable
-                elif isinstance(variable, dict):
-                    if len(variable) != 1:
-                        raise ValueError(
-                            "Variable definition must contain only"
-                            f" one expression: {variable!r}"
-                        )
-                
-                    variable_name, expression = next(iter(variable.items()))
-                    
-                # If parameters file format is wrong
-                else:
-                    raise TypeError(
-                        f"Unsupported variable definition: {variable!r}"
-                    )
-                
-                branch_name = f"{collection_name}_{variable_name}"
-                self.branches.append((branch_name, expression))
-
-    # Return the transformed RDataFrame
-    def analyzers(self, dframe):
-        
-        # Create additional collections
-        for field_name, field_definition in (
-            self.additional_field_definitions.items()
-        ):
-            if "define" in field_definition:
-                dframe = dframe.Define(
-                    field_name,
-                    field_definition["define"],
-                )
-    
         # Apply the event selection
-        if self.selection is not None:
-            # Use Python selection function
-            if self.selection_function is not None:
-                dframe = self.selection_function(dframe)
-            # Use an inline C++ filter expression
-            else:
-                dframe = dframe.Filter(self.selection["filter"])
+        dframe = apply_selection(
+            dframe,
+            selection,
+        )
+
+    except (ValueError, TypeError, KeyError) as error:
+        print(f"Configuration error: {error}")
+        sys.exit(1)
+
+    try:
+        # Collect all indicated variables
+        dframe, branches = collect_variables(
+            dframe,
+            variables,
+            field_definitions,
+        )
+
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        print(f"Configuration error: {error}")
+        sys.exit(1)
+
+    return dframe, branches
+
+
+def convert(args):
+    # Configure the EDM4hep analysis
+    dframe, branches = configure_analysis(
+        args.input_file,
+        args.parameters_file
+    )
+
+    # Configure Snapshot to write an RNTuple
+    snapshot_options = ROOT.RDF.RSnapshotOptions()
+
+    snapshot_options.fOutputFormat = (
+        ROOT.RDF.ESnapshotOutputFormat.kRNTuple
+    )
+
+    # Write reduced RNTuple
+    dframe.Snapshot(
+        "events",
+        args.output_file,
+        branches,
+        snapshot_options,
+    )
+
+    print(f"Saved reduced RNTuple to {args.output_file}")
+
+
+def histogram_edm4hep(args):
+    # Create histograms directly from the EDM4hep file
+    dframe, branches = configure_analysis(
+        args.input_file,
+        args.parameters_file
+    )
+
+    # Book all histogram actions before triggering the event loop
+    histograms = []
+
+    for branch_name in branches:
+        histogram = dframe.Histo1D(
+            (branch_name, "", 50, 0, 150),
+            branch_name,
+        )
+        histograms.append(histogram)
+
+    # Write histogram objects
+    output_file = ROOT.TFile(args.output_file, "RECREATE")
+    for histogram in histograms:
+        histogram.Write()
+
+    output_file.Close()
+
+    print(f"Saved histogram objects to {args.output_file}")
+
+
+def histogram_rntuple(args):
+    dframe = ROOT.RDataFrame("events", args.input_file)
+    output_file = ROOT.TFile(args.output_file, "RECREATE")
+
+    for variable_name in dframe.GetColumnNames():
+        variable_name = str(variable_name)
+
+        histogram = dframe.Histo1D(
+            (variable_name, "", 50, 0, 150),
+            variable_name,
+        )
+
+        histogram.Write()
+
+    output_file.Close()
+
+    print(f"Saved histogram objects to {args.output_file}")    
+
+
+def compare(args):
+    # Compare two ROOT histogram files
+    compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
+
+
+def build_parser():
+    # Create the command-line parser and subcommands
+    parser = ArgumentParser(description="Run a configurable EDM4hep analysis.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Convert command
+    convert_parser = subparsers.add_parser(
+        "convert",
+        help="Read an EDM4hep file, apply the configured analysis steps "
+        "and write the selected variables to a reduced RNTuple"
+    )
+    convert_parser.add_argument("--parameters-file", required=True, type=str,
+                        help="YAML file containing the analysis configuration.")
+    convert_parser.add_argument("--input-file", required=True, type=str,
+                        help="Input EDM4hep ROOT file.")
+    convert_parser.add_argument("--output-file", default="output.root", type=str,
+                        help="Output RNTuple ROOT file.")
+    convert_parser.set_defaults(function=convert)
+
+    # EDM4hep histogram command
+    edm4hep_parser = subparsers.add_parser(
+        "histogram-edm4hep",
+        help="Read an EDM4hep file, apply the configured analysis steps "
+        "and save ROOT histogram objects."
+    )
+    edm4hep_parser.add_argument("--parameters-file", required=True, type=str,
+                        help="YAML file containing the analysis configuration.")
+    edm4hep_parser.add_argument("--input-file", required=True, type=str,
+                        help="Input EDM4hep ROOT file.")
+    edm4hep_parser.add_argument("--output-file", required=True, type=str,
+                                help="Output ROOT histogram file.")
+    edm4hep_parser.set_defaults(function=histogram_edm4hep)
     
-        for branch_name, expression in self.branches:
-            dframe = dframe.Define(branch_name, expression)
+    # RNTuple histogram command
+    rntuple_parser = subparsers.add_parser(
+        "histogram-rntuple",
+        help="Read an RNTuple ROOT file and save ROOT histogram objects.")
+    rntuple_parser.add_argument("--input-file", required=True, type=str,
+                        help="Input RNTuple ROOT file.")
+    rntuple_parser.add_argument("--output-file", required=True, type=str,
+                                help="Output ROOT histogram file.")
+    rntuple_parser.set_defaults(function=histogram_rntuple)
     
-        return dframe
-    
-    # Return the list of branches to save 
-    def output(self):
-        branches = []
-        for branch_name, _ in self.branches:
-            branches.append(branch_name)
-            
-        return branches
+    # Comparison command
+    compare_parser = subparsers.add_parser(
+        "compare",
+        help="Compare two ROOT histogram files",
+    )
+    compare_parser.add_argument("histograms_1", help="First histogram file.")
+    compare_parser.add_argument("histograms_2", help="Second histogram file.")
+    compare_parser.add_argument("--output-file",
+                                default="histogram_comparison.pdf",
+                                help="Output PDF file.")
+    compare_parser.set_defaults(function=compare)
+
+    return parser
+
+
+parser = build_parser()
+args = parser.parse_args()
+args.function(args)

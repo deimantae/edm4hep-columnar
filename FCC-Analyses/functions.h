@@ -1,4 +1,4 @@
-// Code from FCCAnalyses/examples/FCCee/higgs/mass_xsec/functions.h
+// Code adapted from FCCAnalyses/examples/FCCee/higgs/mass_xsec/functions.h
 
 #ifndef ZHfunctions_H
 #define ZHfunctions_H
@@ -13,7 +13,7 @@
 
 namespace FCCAnalyses { namespace ZHfunctions {
  
-// compute the cone isolation for reco particles
+// Compute the cone isolation for reco particles
 struct coneIsolation {
 
     coneIsolation(float arg_dr_min, float arg_dr_max);
@@ -48,7 +48,7 @@ Vec_f coneIsolation::coneIsolation::operator() (Vec_rp in, Vec_rp rps) {
         lv_reco.push_back(tlv);
     }
 
-    // compute the isolation (see https://github.com/delphes/delphes/blob/master/modules/Isolation.cc#L154) 
+    // Compute the isolation (see https://github.com/delphes/delphes/blob/master/modules/Isolation.cc#L154) 
     for (auto & lv_reco_ : lv_reco) {
         double sumNeutral = 0.0;
         double sumCharged = 0.0;
@@ -71,8 +71,7 @@ Vec_f coneIsolation::coneIsolation::operator() (Vec_rp in, Vec_rp rps) {
 }
  
  
- 
-// returns missing energy vector, based on reco particles
+// Returns missing energy vector, based on reco particles
 Vec_rp missingEnergy(float ecm, Vec_rp in, float p_cutoff = 0.0) {
     float px = 0, py = 0, pz = 0, e = 0;
     for(auto &p : in) {
@@ -93,7 +92,348 @@ Vec_rp missingEnergy(float ecm, Vec_rp in, float p_cutoff = 0.0) {
     return ret;
 }
 
+}  // namespace ZHfunctions
 
-}}
+
+// Adapted from analyzers/dataframe/src/ReconstructedParticleSource.cc
+// to operate directly on edm4hep::ReconstructedParticleCollection
+namespace ReconstructedParticleUtils {
+
+ROOT::VecOps::RVec<float>
+getPx(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        result.push_back(
+            particle.getMomentum().x
+        );
+    }
+
+    return result;
+}
+
+
+ROOT::VecOps::RVec<float>
+getPy(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        result.push_back(
+            particle.getMomentum().y
+        );
+    }
+
+    return result;
+}
+
+
+ROOT::VecOps::RVec<float>
+getPz(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        result.push_back(
+            particle.getMomentum().z
+        );
+    }
+
+    return result;
+}
+
+ROOT::VecOps::RVec<float>
+getTheta(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        const auto momentum = particle.getMomentum();
+
+        result.push_back(
+            std::atan2(
+                std::sqrt(momentum.x * momentum.x + momentum.y * momentum.y),
+                momentum.z
+            )
+        );
+    }
+
+    return result;
+}
+
+ROOT::VecOps::RVec<float>
+getPhi(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        const auto momentum = particle.getMomentum();
+
+        result.push_back(
+            std::atan2(momentum.y, momentum.x)
+        );
+    }
+
+    return result;
+}
+
+// Adapted from FCCAnalyses/analyzers/dataframe/src/ReconstructedParticle.cc
+ROOT::VecOps::RVec<float>
+getGoodnessOfPID(
+    const edm4hep::ReconstructedParticleCollection &inColl
+) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        result.push_back(
+            particle.getGoodnessOfPID()
+        );
+    }
+
+    return result;
+}
+
+
+ROOT::VecOps::RVec<float>
+getIsolation(
+    const edm4hep::ReconstructedParticleCollection &particles,
+    const edm4hep::ReconstructedParticleCollection &allParticles,
+    float dr_min = 0.01,
+    float dr_max = 0.5
+) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(particles.size());
+
+    for (const auto &particle : particles) {
+        const auto momentum = particle.getMomentum();
+
+        ROOT::Math::PxPyPzEVector particle_vector(
+            momentum.x,
+            momentum.y,
+            momentum.z,
+            particle.getEnergy()
+        );
+
+        float momentum_sum = 0.0;
+
+        for (const auto &other : allParticles) {
+            const auto other_momentum = other.getMomentum();
+
+            ROOT::Math::PxPyPzEVector other_vector(
+                other_momentum.x,
+                other_momentum.y,
+                other_momentum.z,
+                other.getEnergy()
+            );
+
+            const double delta_eta = particle_vector.Eta() - other_vector.Eta();
+            const double delta_phi =  particle_vector.Phi() - other_vector.Phi();
+
+            const double delta_r = std::sqrt(
+                delta_eta * delta_eta + delta_phi * delta_phi
+            );
+
+            if (delta_r > dr_min && delta_r < dr_max) {
+                momentum_sum += other_vector.P();
+            }
+        }
+
+        result.push_back(
+            momentum_sum / particle_vector.P()
+        );
+    }
+
+    return result;
+}
+
+ROOT::VecOps::RVec<float>
+getD0(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        const auto tracks = particle.getTracks();
+
+        if (tracks.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        const auto trackStates = tracks[0].getTrackStates();
+
+        if (trackStates.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        result.push_back(trackStates[0].D0);
+    }
+
+    return result;
+}
+
+
+ROOT::VecOps::RVec<float>
+getZ0(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        const auto tracks = particle.getTracks();
+
+        if (tracks.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        const auto trackStates = tracks[0].getTrackStates();
+
+        if (trackStates.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        result.push_back(trackStates[0].Z0);
+    }
+
+    return result;
+}
+
+
+// Adapted from FCCAnalyses/analyzers/dataframe/src/ReconstructedParticle2Track.cc
+ROOT::VecOps::RVec<float>
+getD0Error(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        const auto tracks = particle.getTracks();
+
+        if (tracks.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        const auto trackStates = tracks[0].getTrackStates();
+
+        if (trackStates.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        result.push_back(
+            std::sqrt(trackStates[0].covMatrix[0])
+        );
+    }
+
+    return result;
+}
+
+
+ROOT::VecOps::RVec<float>
+getZ0Error(const edm4hep::ReconstructedParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        const auto tracks = particle.getTracks();
+
+        if (tracks.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        const auto trackStates = tracks[0].getTrackStates();
+
+        if (trackStates.empty()) {
+            result.push_back(-9.);
+            continue;
+        }
+
+        result.push_back(
+            std::sqrt(trackStates[0].covMatrix[9])
+        );
+    }
+
+    return result;
+}
+
+edm4hep::ReconstructedParticleCollection
+getMissingEnergy(
+    float ecm,
+    const edm4hep::ReconstructedParticleCollection &inColl,
+    float p_cutoff = 0.0
+) {
+    float px = 0.0;
+    float py = 0.0;
+    float pz = 0.0;
+    float energy = 0.0;
+
+    for (const auto &particle : inColl) {
+        const auto momentum = particle.getMomentum();
+
+        const float pt = std::sqrt(
+            momentum.x * momentum.x
+            + momentum.y * momentum.y
+        );
+
+        if (pt < p_cutoff) {
+            continue;
+        }
+
+        px -= momentum.x;
+        py -= momentum.y;
+        pz -= momentum.z;
+        energy += particle.getEnergy();
+    }
+
+    edm4hep::ReconstructedParticleCollection result;
+    auto missing = result.create();
+    missing.setMomentum(
+        edm4hep::Vector3f{
+            px,
+            py,
+            pz,
+        }
+    );
+
+    missing.setEnergy(ecm - energy);
+    return result;
+}
+
+}  // namespace ReconstructedParticleUtils
+
+
+// Adapted from FCCAnalyses/analyzers/dataframe/src/MCParticle.cc
+// to operate directly on edm4hep::MCParticleCollection
+namespace MCParticleUtils {
+
+ROOT::VecOps::RVec<float>
+getEnergy(const edm4hep::MCParticleCollection &inColl) {
+    ROOT::VecOps::RVec<float> result;
+    result.reserve(inColl.size());
+
+    for (const auto &particle : inColl) {
+        const auto momentum = particle.getMomentum();
+        const auto mass = particle.getMass();
+
+        const float energy = std::sqrt(
+            momentum.x * momentum.x
+            + momentum.y * momentum.y
+            + momentum.z * momentum.z
+            + mass * mass
+        );
+
+        result.push_back(energy);
+    }
+
+    return result;
+}
+
+}  // namespace MCParticleUtils
+
+}  // namespace FCCAnalyses
 
 #endif

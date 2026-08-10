@@ -5,6 +5,7 @@ Helper functions to load and validate user-defined analysis modules
 import importlib.util
 from pathlib import Path
 
+
 def load_function(file_name, function_name, section_name):
     if not Path(file_name).is_file():
         raise ValueError(
@@ -42,6 +43,7 @@ def load_function(file_name, function_name, section_name):
         )
 
     return function
+
 
 def validate_function_config(config, section_name):
     if not isinstance(config, dict):
