@@ -27,7 +27,6 @@ variables:
     - theta: "np.arctan2(np.sqrt(px*px + py*py), pz)"
     - phi: "np.arctan2(py, px)"
     - energy
-    - mass
     - charge
 
   Muon:
@@ -41,11 +40,11 @@ variables:
     - energy
     - charge
     - goodnessOfPID
-    - isolation
     - d0
     - z0
     - d0Error
     - z0Error
+    - isolation
 
   Electron:
     - px
@@ -78,9 +77,11 @@ variables:
     - px
     - py
     - pz
+    - pt: "np.sqrt(px*px + py*py)"
     - energy
 
   EventInfo:
     - event
     - run
+ #   - weight
     - nTrack

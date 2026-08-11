@@ -1,7 +1,7 @@
 '''
-Compare two histogram files.
+Compare two histogram files
 
-This script can be run directly or imported by edm4hep_reduce.py
+This script can be run directly or imported by edm4hep_columnar.py
 '''
 
 from argparse import ArgumentParser
@@ -21,6 +21,10 @@ def compare_histograms(
     # Load histogram objects
     histograms_1 = util.load(histograms_1_path)
     histograms_2 = util.load(histograms_2_path)
+    print("Comparing histograms...\n")
+    
+    # Count different histograms for validation
+    different = 0
         
     # Plot style
     hep.style.use("ROOT")
@@ -63,6 +67,13 @@ def compare_histograms(
         
             # Difference panel
             difference = histogram_1.values() - histogram_2.values()
+            
+            # Validation
+            if (difference == 0).all():
+                print(f"{branch:.<30} identical")
+            else:
+                print(f"{branch:.<30} different")
+                different += 1
             
             ax_difference.axhline(
                 0,
@@ -123,7 +134,18 @@ def compare_histograms(
             pdf.savefig(fig)
             plt.close(fig)
     
-    print(f"Saved comparison to {output_file}")
+        if different == 0:
+            print(
+                f"\nValidation successful: all {len(histograms_2)} "
+                "histograms are identical."
+            )
+        else:
+            print(
+                f"\nValidation failed: {different} of {len(histograms_2)} "
+                "histograms differ."
+            )
+    
+        print(f"Saved comparison to {output_file}")
     
 
 # Parse command-line arguments and run the comparison
@@ -141,7 +163,7 @@ def main():
     
     compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
 
-# Allow this file to be imported by edm4hep_reduce.py
+# Allow this file to be imported by edm4hep_columnar.py
 # without executing the CLI
 if __name__ == "__main__":
     main()
