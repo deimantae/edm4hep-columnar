@@ -21,6 +21,10 @@ def compare_histograms(
     # Open histogram files
     histograms_1 = ROOT.TFile.Open(histograms_1_path, "READ")
     histograms_2 = ROOT.TFile.Open(histograms_2_path, "READ")
+    print("Comparing histograms...\n")
+    
+    # Count different histograms for validation
+    different = 0
 
     # Plot style
     plt.rcParams.update({
@@ -56,6 +60,13 @@ def compare_histograms(
 
             for value_1, value_2 in zip(values_1, values_2):
                 difference.append(value_1 - value_2)
+            
+            # Validation
+            if all(value == 0 for value in difference):
+                print(f"{branch:.<30} identical")
+            else:
+                print(f"{branch:.<30} different")
+                different += 1
 
             fig, (ax, ax_difference) = plt.subplots(
                 2,
@@ -149,10 +160,24 @@ def compare_histograms(
             pdf.savefig(fig)
             plt.close(fig)
 
+    number_histograms = histograms_2.GetListOfKeys().GetSize()
+
+    if different == 0:
+        print(
+            f"\nValidation successful: all {number_histograms} "
+            "histograms are identical."
+        )
+    else:
+        print(
+            f"\nValidation failed: {different} of {number_histograms} "
+            "histograms differ."
+        )
+    
     histograms_1.Close()
     histograms_2.Close()
-
+    
     print(f"Saved comparison to {output_file}")
+
 
 
 def main():

@@ -1,47 +1,43 @@
 """
 Helper functions for optional analysis steps defined in the YAML configuration.
 """
+import ROOT
 
 from module_loader import load_function, validate_function_config
 
-
+# Add collections defined in the YAML
 def add_fields(dframe, additional_fields):
-    additional_field_definitions = {}
+    for field_name, expression in additional_fields.items():
+        dframe = dframe.Define(field_name, expression)
 
-    for field_config in additional_fields:
-        validate_function_config(
-            field_config,
-            "additional_fields",
+    return dframe
+
+
+def resolve_function(collection_name, function_name):
+    # Check FCCAnalyses helpers first
+    podio_namespace = ROOT.FCCAnalyses.PodioSource.ReconstructedParticle
+
+    if hasattr(podio_namespace, function_name):
+        return (
+            "FCCAnalyses::PodioSource::ReconstructedParticle::"
+            f"{function_name}({collection_name})"
         )
 
-        function_name = field_config["function"]
+    # Check user-defined helpers
+    custom_namespace = ROOT.EDM4hepColumnar
 
-        fields_function = load_function(
-            field_config["file_name"],
-            function_name,
-            "additional_fields",
+    if hasattr(custom_namespace, function_name):
+        return (
+            "EDM4hepColumnar::"
+            f"{function_name}({collection_name})"
         )
 
-        field_definitions = fields_function()
-
-        if not isinstance(field_definitions, dict):
-            raise TypeError(
-                "Invalid additional-fields function result: "
-                f"function '{function_name}' must return a dictionary."
-            )
-
-        for field_name, field_definition in field_definitions.items():
-            if "define" in field_definition:
-                dframe = dframe.Define(
-                    field_name,
-                    field_definition["define"],
-                )
-
-        additional_field_definitions.update(field_definitions)
-
-    return dframe, additional_field_definitions
-
-
+    raise ValueError(
+        f"Function '{function_name}' was not found for "
+        f"collection '{collection_name}'."
+    )
+    
+    
 def apply_selection(dframe, selection):
     if selection is None:
         return dframe
@@ -91,49 +87,38 @@ def apply_selection(dframe, selection):
     return dframe
 
 
-def collect_variables(dframe, variables, additional_field_definitions):
+def collect_variables(dframe, variables):
     branches = []
 
     for collection_name, variable_list in variables.items():
         if variable_list is None:
-            continue  # for empty entries
+            continue
 
         for variable in variable_list:
-
-            if isinstance(variable, str):
-                variable_name = variable
-
-                if collection_name in additional_field_definitions:
-                    field_definition = additional_field_definitions[
-                        collection_name
-                    ]
-
-                    expression = field_definition["expression"](
-                        collection_name,
-                        variable_name,
-                    )
-
-                else:
-                    expression = f"{collection_name}.{variable_name}"
-
-            elif isinstance(variable, dict):
-                if len(variable) != 1:
-                    raise ValueError(
-                        "Invalid variable definition in the YAML file: "
-                        f"expected exactly one expression, got {variable!r}."
-                    )
-
-                variable_name, expression = next(iter(variable.items()))
-
-            else:
+            if not isinstance(variable, dict) or len(variable) != 1:
+                raise ValueError(
+                    "Invalid variable definition in the YAML file: "
+                    f"expected 'name: function/expression', got {variable!r}."
+                )
+                
+            variable_name, value = next(iter(variable.items()))
+            
+            if not isinstance(value, str):
                 raise TypeError(
                     "Invalid variable definition in the YAML file: "
-                    f"unsupported variable definition {variable!r}. "
-                    "Expected a variable name or a single expression."
+                    f"expected a string, got {value!r}."
                 )
-
+                
+            # Simple function name, e.g. pt: getPt
+            if value.isidentifier():
+                expression = resolve_function(collection_name, value)
+            
+            # Full C++ expression
+            else:
+                expression = value
+                    
             output_name = f"{collection_name}_{variable_name}"
-
+                
             dframe = dframe.Define(output_name, expression)
             branches.append(output_name)
 

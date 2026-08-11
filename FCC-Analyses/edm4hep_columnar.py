@@ -5,6 +5,7 @@ and validation commands.
 import sys
 import yaml
 from argparse import ArgumentParser
+from pathlib import Path
 
 import ROOT
 
@@ -18,6 +19,10 @@ ROOT.gSystem.Load("libFCCAnalyses")
 if ROOT.dummyLoader:
     print("----> DEBUG: Found FCCAnalyses library.")
     ROOT.gInterpreter.Declare("using namespace FCCAnalyses::PodioSource;")
+    
+functions_header = Path(__file__).resolve().parent / "functions.h"
+ROOT.gInterpreter.Declare(f'#include "{functions_header}"')
+
 print("----> INFO: Loading analyzers from libFCCAnalyses...")
 
 # Load podio DataSource
@@ -35,7 +40,7 @@ def load_configuration(parameters_file):
     selection = contents.get("selection")
 
     # Optional additional fields
-    additional_fields = contents.get("additional_fields") or []
+    additional_fields = contents.get("additional_fields") or {}
 
     # Variables to collect
     variables = contents.get("variables") or {}
@@ -70,16 +75,10 @@ def configure_analysis(input_file, parameters_file):
 
     try:
         # Add user-defined fields to the dataframe
-        dframe, field_definitions = add_fields(
-            dframe,
-            additional_fields,
-        )
-
+        dframe = add_fields(dframe, additional_fields)
+        
         # Apply the event selection
-        dframe = apply_selection(
-            dframe,
-            selection,
-        )
+        dframe = apply_selection(dframe, selection)
 
     except (ValueError, TypeError, KeyError) as error:
         print(f"Configuration error: {error}")
@@ -87,11 +86,7 @@ def configure_analysis(input_file, parameters_file):
 
     try:
         # Collect all indicated variables
-        dframe, branches = collect_variables(
-            dframe,
-            variables,
-            field_definitions,
-        )
+        dframe, branches = collect_variables(dframe, variables)
 
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         print(f"Configuration error: {error}")
@@ -136,15 +131,19 @@ def histogram_edm4hep(args):
     histograms = []
 
     for branch_name in branches:
+
         histogram = dframe.Histo1D(
-            (branch_name, "", 50, 0, 150),
+            (branch_name, "", 100, 0, 0),
             branch_name,
         )
         histograms.append(histogram)
-
+        
     # Write histogram objects
     output_file = ROOT.TFile(args.output_file, "RECREATE")
     for histogram in histograms:
+        # Skip empty variables
+        if histogram.GetEntries() == 0:
+            continue
         histogram.Write()
 
     output_file.Close()
@@ -158,9 +157,9 @@ def histogram_rntuple(args):
 
     for variable_name in dframe.GetColumnNames():
         variable_name = str(variable_name)
-
+        
         histogram = dframe.Histo1D(
-            (variable_name, "", 50, 0, 150),
+            (variable_name, "", 100, 0, 0),
             variable_name,
         )
 
@@ -169,7 +168,7 @@ def histogram_rntuple(args):
     output_file.Close()
 
     print(f"Saved histogram objects to {args.output_file}")    
-
+    
 
 def compare(args):
     # Compare two ROOT histogram files
