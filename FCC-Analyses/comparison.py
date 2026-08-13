@@ -42,7 +42,10 @@ def compare_histograms(
             histogram_1 = histograms_1.Get(branch)
             histogram_2 = histograms_2.Get(branch)
 
+            # Check if no histograms are missing from either file
             if not histogram_1 or not histogram_2:
+                print(f"{branch:.<30} missing")
+                different += 1
                 continue
 
             bin_centers = []
@@ -129,8 +132,11 @@ def compare_histograms(
             ax_difference.set_xlabel(branch)
 
             # Center axis labels
-            ax.yaxis.set_label_coords(-0.08, 0.5)
-            ax_difference.yaxis.set_label_coords(-0.08, 0.7)
+            ax.yaxis.set_label_coords(-0.13, 0.5)
+            ax_difference.yaxis.set_label_coords(-0.13, 0.5)
+            
+            # More space for y axis labels
+            fig.subplots_adjust(left=0.18)
 
             # Ticks pointing inward
             for axis in (ax, ax_difference):
@@ -179,19 +185,14 @@ def compare_histograms(
     print(f"Saved comparison to {output_file}")
 
 
-
 def main():
-    parser = ArgumentParser(description="Compare two histogram files.")
-    parser.add_argument("histograms_1", help="First histogram ROOT file.")
-    parser.add_argument("histograms_2", help="Second histogram ROOT file.")
-    parser.add_argument(
-    "--output-file",
-    default="histogram_comparison.pdf",
-    help="Output PDF file.",
-)
+    parser = ArgumentParser(description="Compare two ROOT histogram files")
+    parser.add_argument("histograms_1", help="First histogram file")
+    parser.add_argument("histograms_2", help="Second histogram file")
+    parser.add_argument("--output-file", default="histogram_comparison.pdf",
+                        help="Output PDF file")
     
     args = parser.parse_args()
-
     compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
 
 

@@ -95,6 +95,39 @@ def configure_analysis(input_file, parameters_file):
     return dframe, branches
 
 
+def create_histograms(dframe, branches):
+    # Create ROOT histogram objects
+    histograms = []
+    
+    for branch_name in branches:
+        branch_name = str(branch_name)
+
+        histogram = dframe.Histo1D(
+            (branch_name, "", 100, 0, 0),
+            branch_name,
+        )
+        histograms.append(histogram)
+
+    return histograms
+
+
+def write_histograms(histograms, output_file):
+    # Write ROOT histogram objects
+    root_file = ROOT.TFile(output_file, "RECREATE")
+
+    for histogram in histograms:
+        # Skip empty variables
+        if histogram.GetEntries() == 0:
+            continue
+        histogram.Write()
+
+    root_file.Close()
+
+    print(f"Saved histogram objects to {output_file}")
+
+
+# Commands
+
 def convert(args):
     # Configure the EDM4hep analysis
     dframe, branches = configure_analysis(
@@ -126,49 +159,19 @@ def histogram_edm4hep(args):
         args.input_file,
         args.parameters_file
     )
-
-    # Book all histogram actions before triggering the event loop
-    histograms = []
-
-    for branch_name in branches:
-
-        histogram = dframe.Histo1D(
-            (branch_name, "", 100, 0, 0),
-            branch_name,
-        )
-        histograms.append(histogram)
-        
-    # Write histogram objects
-    output_file = ROOT.TFile(args.output_file, "RECREATE")
-    for histogram in histograms:
-        # Skip empty variables
-        if histogram.GetEntries() == 0:
-            continue
-        histogram.Write()
-
-    output_file.Close()
-
-    print(f"Saved histogram objects to {args.output_file}")
+    
+    histograms = create_histograms(dframe, branches)
+    write_histograms(histograms, args.output_file)
 
 
 def histogram_rntuple(args):
+    # Create histograms from the reduced RNTuple
     dframe = ROOT.RDataFrame("events", args.input_file)
-    output_file = ROOT.TFile(args.output_file, "RECREATE")
-
-    for variable_name in dframe.GetColumnNames():
-        variable_name = str(variable_name)
-        
-        histogram = dframe.Histo1D(
-            (variable_name, "", 100, 0, 0),
-            variable_name,
-        )
-
-        histogram.Write()
-
-    output_file.Close()
-
-    print(f"Saved histogram objects to {args.output_file}")    
+    branches = dframe.GetColumnNames()
     
+    histograms = create_histograms(dframe, branches)
+    write_histograms(histograms, args.output_file)
+
 
 def compare(args):
     # Compare two ROOT histogram files
@@ -183,51 +186,50 @@ def build_parser():
     # Convert command
     convert_parser = subparsers.add_parser(
         "convert",
-        help="Read an EDM4hep file, apply the configured analysis steps "
-        "and write the selected variables to a reduced RNTuple"
+        help="Convert EDM4hep to a reduced RNTuple"
     )
     convert_parser.add_argument("--parameters-file", required=True, type=str,
-                        help="YAML file containing the analysis configuration.")
+                        help="Analysis configuration file")
     convert_parser.add_argument("--input-file", required=True, type=str,
-                        help="Input EDM4hep ROOT file.")
+                        help="Input EDM4hep ROOT file")
     convert_parser.add_argument("--output-file", default="output.root", type=str,
-                        help="Output RNTuple ROOT file.")
+                        help="Output reduced RNTuple file")
     convert_parser.set_defaults(function=convert)
 
     # EDM4hep histogram command
     edm4hep_parser = subparsers.add_parser(
         "histogram-edm4hep",
-        help="Read an EDM4hep file, apply the configured analysis steps "
-        "and save ROOT histogram objects."
+        help="Create histograms from the original EDM4hep file"
     )
     edm4hep_parser.add_argument("--parameters-file", required=True, type=str,
-                        help="YAML file containing the analysis configuration.")
+                                help="Analysis configuration file")
     edm4hep_parser.add_argument("--input-file", required=True, type=str,
-                        help="Input EDM4hep ROOT file.")
+                                help="Input EDM4hep file")
     edm4hep_parser.add_argument("--output-file", required=True, type=str,
-                                help="Output ROOT histogram file.")
+                                help="Output histogram file")
     edm4hep_parser.set_defaults(function=histogram_edm4hep)
     
     # RNTuple histogram command
     rntuple_parser = subparsers.add_parser(
         "histogram-rntuple",
-        help="Read an RNTuple ROOT file and save ROOT histogram objects.")
+        help="Create histograms from the reduced RNTuple file"
+        )
     rntuple_parser.add_argument("--input-file", required=True, type=str,
-                        help="Input RNTuple ROOT file.")
+                                help="Input reduced RNTuple file")
     rntuple_parser.add_argument("--output-file", required=True, type=str,
-                                help="Output ROOT histogram file.")
+                                help="Output histogram file")
     rntuple_parser.set_defaults(function=histogram_rntuple)
     
     # Comparison command
     compare_parser = subparsers.add_parser(
         "compare",
-        help="Compare two ROOT histogram files",
+        help="Compare histograms and verify the conversion",
     )
-    compare_parser.add_argument("histograms_1", help="First histogram file.")
-    compare_parser.add_argument("histograms_2", help="Second histogram file.")
+    compare_parser.add_argument("histograms_1", help="First histogram file")
+    compare_parser.add_argument("histograms_2", help="Second histogram file")
     compare_parser.add_argument("--output-file",
                                 default="histogram_comparison.pdf",
-                                help="Output PDF file.")
+                                help="Output PDF file")
     compare_parser.set_defaults(function=compare)
 
     return parser
