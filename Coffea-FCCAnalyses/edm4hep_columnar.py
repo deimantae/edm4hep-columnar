@@ -7,11 +7,10 @@ import sys
 from argparse import ArgumentParser
 
 import awkward as ak
-import hist
+import ROOT
 import uproot
 import yaml
 
-from coffea import util
 from coffea.nanoevents import FCC, NanoEventsFactory
 
 from analysis_helpers import add_fields, apply_selection, collect_variables
@@ -78,50 +77,38 @@ def configure_analysis(input_file, parameters_file):
 
 
 def create_histograms(variables):
-    # Create Coffea histogram objects from the filtered dictionary of arrays
+    # Create ROOT histogram objects from the filtered dictionary of arrays
     histograms = {}
-
+    
+    # Flatten Awkward arrays first
     for variable_name, values in variables.items():
         values = ak.ravel(values)
-
         # Skip empty variables
         if len(values) == 0:
             continue
         
-        minimum = float(ak.min(values))
-        maximum = float(ak.max(values))
+        values = ak.to_numpy(values)
+        histogram = ROOT.TH1D(variable_name, "", 100, 0, 0)
 
-        # Avoid a zero width range
-        if minimum == maximum:
-            margin = 0.5 if minimum == 0 else 0.1 * abs(minimum)
-            minimum -= margin
-            maximum += margin
-
-        histogram = (
-            hist.Hist.new
-            .Reg(100, minimum, maximum)
-            .Double()
-            .fill(values)
-        )
-
+        for value in values:
+            histogram.Fill(value)
         histograms[variable_name] = histogram
 
     return histograms
 
-def histogram_edm4hep(args):
-    # Create histograms directly from the original EDM4hep file
-    selected_variables = configure_analysis(
-        args.input_file,
-        args.parameters_file
-        )
-    
-    histograms = create_histograms(selected_variables)
-    
-    util.save(histograms, args.output_file)
-    print(f"Saved histogram objects to {args.output_file}")
-    #look at coffea util
-    # best if root files
-    
+
+def write_histograms(histograms, output_file):
+    # Write ROOT histogram objects
+    root_file = ROOT.TFile(output_file, "RECREATE")
+
+    for histogram in histograms.values():
+        histogram.Write()
+    root_file.Close()
+
+    print(f"Saved histogram objects to {output_file}")
+
+
+# Commands
     
 def convert(args):
     # Write filtered variables to a reduced RNTuple
@@ -138,11 +125,22 @@ def convert(args):
     print(f"Saved RNTuple to {args.output_file}")   
 
 
+def histogram_edm4hep(args):
+    # Create histograms directly from the original EDM4hep file
+    selected_variables = configure_analysis(
+        args.input_file,
+        args.parameters_file
+    )
+
+    histograms = create_histograms(selected_variables)
+    write_histograms(histograms, args.output_file)
+
+
 def histogram_rntuple(args):
     # Open the reduced RNTuple
     with uproot.open(args.input_file) as input_file:
         arrays = input_file["Events"].arrays()
-    
+
     # Convert the Awkward array to a dictionary
     variables = {}
 
@@ -150,13 +148,11 @@ def histogram_rntuple(args):
         variables[variable_name] = arrays[variable_name]
 
     histograms = create_histograms(variables)
-
-    util.save(histograms, args.output_file)
-    print(f"Saved histogram objects to {args.output_file}")
+    write_histograms(histograms, args.output_file)
 
 
 def compare(args):
-    # Compare two Coffea histogram files.
+    # Compare two ROOT histogram files
     compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
 
     
@@ -168,51 +164,50 @@ def build_parser():
     # Convert command
     convert_parser = subparsers.add_parser(
         "convert",
-        help="Read an EDM4hep file, apply the configured analysis steps "
-        "and write the selected variables to an reduced RNTuple"
+        help="Convert EDM4hep to a reduced RNTuple"
     )
     convert_parser.add_argument("--parameters-file", required=True, type=str,
-                        help="YAML file containing the analysis configuration.")
+                        help="Analysis configuration file")
     convert_parser.add_argument("--input-file", required=True, type=str,
-                        help="Input EDM4hep ROOT file.")
+                        help="Input EDM4hep ROOT file")
     convert_parser.add_argument("--output-file", default="output.root", type=str,
-                        help="Output RNTuple ROOT file.")
+                        help="Output reduced RNTuple file")
     convert_parser.set_defaults(function=convert)
     
     # EDM4hep histogram command
     edm4hep_parser = subparsers.add_parser(
         "histogram-edm4hep",
-        help="Read an EDM4hep file, apply the configured analysis steps "
-        "and save Coffea histogram objects to a .coffea file."
+        help="Create histograms from the original EDM4hep file"
     )
     edm4hep_parser.add_argument("--parameters-file", required=True, type=str,
-                        help="YAML file containing the analysis configuration.")
+                                help="Analysis configuration file")
     edm4hep_parser.add_argument("--input-file", required=True, type=str,
-                        help="Input EDM4hep ROOT file.")
+                                help="Input EDM4hep file")
     edm4hep_parser.add_argument("--output-file", required=True, type=str,
-                                help="Output Coffea histogram file.")
+                                help="Output histogram file")
     edm4hep_parser.set_defaults(function=histogram_edm4hep)
     
     # RNTuple histogram command
     rntuple_parser = subparsers.add_parser(
         "histogram-rntuple",
-        help="Read an RNTuple ROOT file and save Coffea histogram objects.")
+        help="Create histograms from the reduced RNTuple file"
+        )
     rntuple_parser.add_argument("--input-file", required=True, type=str,
-                        help="Input RNTuple ROOT file.")
+                                help="Input reduced RNTuple file")
     rntuple_parser.add_argument("--output-file", required=True, type=str,
-                                help="Output Coffea histogram file.")
+                                help="Output histogram file")
     rntuple_parser.set_defaults(function=histogram_rntuple)
     
     # Comparison command
     compare_parser = subparsers.add_parser(
         "compare",
-        help="Compare two Coffea histogram files",
+        help="Compare histograms and verify the conversion",
     )
-    compare_parser.add_argument("histograms_1", help="First histogram file.")
-    compare_parser.add_argument("histograms_2", help="Second histogram file.")
+    compare_parser.add_argument("histograms_1", help="First histogram file")
+    compare_parser.add_argument("histograms_2", help="Second histogram file")
     compare_parser.add_argument("--output-file",
                                 default="histogram_comparison.pdf",
-                                help="Output PDF file.")
+                                help="Output PDF file")
     compare_parser.set_defaults(function=compare)
 
     return parser
