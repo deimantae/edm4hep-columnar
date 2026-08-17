@@ -1,8 +1,8 @@
-selection:
+selection: null
   # Option 1: use a Python selection function
-  script:
-    file_name: event_selection.py
-    function: select_pt
+#  script:
+ #   file_name: event_selection.py
+  #  function: select_pt
 
   # Option 2: use an inline C++ filter expression
   # filter: "ROOT::VecOps::Any(ReconstructedParticle::getPt(Jet) > 90)"

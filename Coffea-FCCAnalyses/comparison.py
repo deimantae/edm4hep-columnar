@@ -22,7 +22,7 @@ def compare_histograms(
     histograms_1 = ROOT.TFile.Open(histograms_1_path, "READ")
     histograms_2 = ROOT.TFile.Open(histograms_2_path, "READ")
     print("Comparing histograms...\n")
-    
+
     # Count different histograms for validation
     different = 0
 
@@ -63,7 +63,7 @@ def compare_histograms(
 
             for value_1, value_2 in zip(values_1, values_2):
                 difference.append(value_1 - value_2)
-            
+
             # Validation
             if all(value == 0 for value in difference):
                 print(f"{branch:.<30} identical")
@@ -134,7 +134,7 @@ def compare_histograms(
             # Center axis labels
             ax.yaxis.set_label_coords(-0.13, 0.5)
             ax_difference.yaxis.set_label_coords(-0.13, 0.5)
-            
+
             # More space for y axis labels
             fig.subplots_adjust(left=0.18)
 
@@ -178,10 +178,10 @@ def compare_histograms(
             f"\nValidation failed: {different} of {number_histograms} "
             "histograms differ."
         )
-    
+
     histograms_1.Close()
     histograms_2.Close()
-    
+
     print(f"Saved comparison to {output_file}")
 
 
@@ -191,7 +191,7 @@ def main():
     parser.add_argument("histograms_2", help="Second histogram file")
     parser.add_argument("--output-file", default="histogram_comparison.pdf",
                         help="Output PDF file")
-    
+
     args = parser.parse_args()
     compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
 
