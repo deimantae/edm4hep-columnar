@@ -33,23 +33,22 @@ def eta(particles):
 
 
 # Return the track state associated with reco particles
-def track_information(particles, events):
+def track_information(particles):
 
     # Match each reco particle to its track
-    track_indices = particles.tracks.begin
-    tracks = events.EFlowTrack[track_indices]
+    tracks = particles.get_tracks
 
     # Match each track to its corresponding track state
-    state_indices = tracks.trackStates.begin
-    states = events.EFlowTrack_1[state_indices]
+    tracks = ak.firsts(tracks, axis=2)
+    states = ak.firsts(tracks.trackStates, axis=2)
 
     return states
 
 
 def muon_isolation(muons, events, dr_min=0.01, dr_max=0.5):
     particles = events.ReconstructedParticles
-    
-    # Add a new axis to compare every muon with every reconstructed particle
+
+   # Add a new axis to compare every muon with every reconstructed particle
     muon_eta = eta(muons)[:, :, None]
     muon_phi = phi(muons)[:, :, None]
     muon_p = p(muons)
@@ -72,19 +71,19 @@ def muon_isolation(muons, events, dr_min=0.01, dr_max=0.5):
     # Return the relative cone isolation
     return cone_p / ak.where(muon_p != 0, muon_p, np.nan)
 
-    
+
 # ---------- User-defined collections ----------
 
 
 def particle_collections(events):
-    muons = events.ReconstructedParticles[events.Muonidx0.index]
-    electrons = events.ReconstructedParticles[events.Electronidx0.index]
-    photons = events.ReconstructedParticles[events.Photonidx0.index]
-    
+    muons = events.ReconstructedParticles[events.Muon_objIdx.index]
+    electrons = events.ReconstructedParticles[events.Electron_objIdx.index]
+    photons = events.ReconstructedParticles[events.Photon_objIdx.index]
+
     # Retrieve the track state information for charged particles
-    muon_track_states = track_information(muons, events)
-    electron_track_states = track_information(electrons, events)
-    
+    muon_track_states = track_information(muons)
+    electron_track_states = track_information(electrons)
+
     # Add the relative cone isolation
     muons = ak.with_field(muons, muon_isolation(muons, events), "isolation")
 
@@ -93,11 +92,11 @@ def particle_collections(events):
     muons = ak.with_field(muons, muon_track_states.Z0, "z0")
     electrons = ak.with_field(electrons, electron_track_states.D0, "d0")
     electrons = ak.with_field(electrons, electron_track_states.Z0, "z0")
-    
+
     # Track state covariance matrix (21 elements)
-    muon_cov = muon_track_states["covMatrix_21_"]
-    electron_cov = electron_track_states["covMatrix_21_"]
-        
+    muon_cov = muon_track_states.covMatrix
+    electron_cov = electron_track_states.covMatrix
+
     # Add the uncertainties
     # FCCAnalyses uses covariance element 0 for D0 and 9 for Z0
     # https://github.com/HEP-FCC/FCCAnalyses/blob/master/analyzers/dataframe/src/ReconstructedParticle2Track.cc
@@ -123,7 +122,7 @@ def missing_energy(events):
     # Compute the center-of-mass energy from the beam particles
     beam_energy = np.sqrt(beam_particles.px**2 + beam_particles.py**2 +
                           beam_particles.pz**2 + beam_particles.mass**2)
-    
+
     ecm = ak.sum(beam_energy, axis=1)
 
     missing = ak.zip({
@@ -138,16 +137,11 @@ def missing_energy(events):
     }
 
 def event_information(events):
-    # The input file used in this example does not contain event number
-    # information, thus an event counter is assigned
-    n_events = len(events)
-
     return {
         "EventInfo": ak.zip({
-            "event": ak.Array(np.arange(n_events, dtype=np.int64)),
-            # The input file used in this example does not contain run
-            # information, thus a default run number of 1 is assigned
-            "run": ak.Array(np.ones(n_events, dtype=np.int32)),
+            "event": ak.firsts(events.EventHeader.eventNumber),
+            "run": ak.firsts(events.EventHeader.runNumber),
+            "weight": ak.firsts(events.EventHeader.weight),
             "nTrack": ak.num(events.EFlowTrack, axis=1),
         })
     }

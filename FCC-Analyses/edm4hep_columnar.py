@@ -16,10 +16,15 @@ from comparison import compare_histograms
 # Adapted from FCCAnalyses/examples/data_source/standalone.py
 
 ROOT.gSystem.Load("libFCCAnalyses")
+ROOT.gInterpreter.Declare("""
+#include "edm4hep/EventHeaderCollection.h"
+#include "edm4hep/TrackCollection.h"
+""")
+
 if ROOT.dummyLoader:
     print("----> DEBUG: Found FCCAnalyses library.")
     ROOT.gInterpreter.Declare("using namespace FCCAnalyses::PodioSource;")
-    
+
 functions_header = Path(__file__).resolve().parent / "functions.h"
 ROOT.gInterpreter.Declare(f'#include "{functions_header}"')
 

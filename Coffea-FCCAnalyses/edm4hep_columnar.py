@@ -22,13 +22,13 @@ def load_configuration(parameters_file):
     # and store its contents as a dictionary
     with open(parameters_file, "r") as file:
         contents = yaml.safe_load(file) or {}
-    
+
     # Optional event selection
     selection = contents.get("selection")
-    
+
     # Optional additional fields
     additional_fields = contents.get("additional_fields") or []
-    
+
     # Variables to collect
     variables = contents.get("variables") or {}
 
@@ -39,9 +39,10 @@ def open_edm4hep(input_file):
     # Open the EDM4hep ROOT file
     return NanoEventsFactory.from_root(
         {input_file: "events"},
-        schemaclass=FCC.get_schema(version="pre-edm4hep1"),
+        schemaclass=FCC.get_schema(version="edm4hep1"),
         mode="eager",
-        iteritems_options={"filter_name": "/^(?!.*(PARAMETERS|_.*Map))/"},
+    #    iteritems_options={"filter_name": "/^(?!.*(PARAMETERS|_.*Map))/"},
+        iteritems_options={"filter_name": "/^(?!.*(PARAMETERS|_.*Map|RecoMCLink)).*$/"},
         entry_stop=100,
     ).events()
 
@@ -51,16 +52,16 @@ def configure_analysis(input_file, parameters_file):
     selection, additional_fields, variables = (
         load_configuration(parameters_file)
         )
-    
+
     events = open_edm4hep(input_file)
 
     try:
         # Add user-defined fields to the events array
         events = add_fields(events, additional_fields)
-    
+
         # Apply the event selection
         events = apply_selection(events, selection)
-        
+
     except (ValueError, TypeError, KeyError) as error:
         print(f"Configuration error: {error}")
         sys.exit(1)
@@ -68,25 +69,25 @@ def configure_analysis(input_file, parameters_file):
     try:
         # Collect all indicated variables
         selected_variables = collect_variables(events, variables)
-    
+
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         print(f"Configuration error: {error}")
         sys.exit(1)
-        
+
     return selected_variables
 
 
 def create_histograms(variables):
     # Create ROOT histogram objects from the filtered dictionary of arrays
     histograms = {}
-    
+
     # Flatten Awkward arrays first
     for variable_name, values in variables.items():
         values = ak.ravel(values)
         # Skip empty variables
         if len(values) == 0:
             continue
-        
+
         values = ak.to_numpy(values)
         histogram = ROOT.TH1D(variable_name, "", 100, 0, 0)
 
@@ -109,20 +110,20 @@ def write_histograms(histograms, output_file):
 
 
 # Commands
-    
+
 def convert(args):
     # Write filtered variables to a reduced RNTuple
     selected_variables = configure_analysis(
         args.input_file,
         args.parameters_file
         )
-    
+
     rntuple_array = ak.zip(selected_variables, depth_limit=1)
 
     with uproot.recreate(args.output_file) as output_file:
         output_file.mkrntuple("Events", rntuple_array)
-    
-    print(f"Saved RNTuple to {args.output_file}")   
+
+    print(f"Saved RNTuple to {args.output_file}")
 
 
 def histogram_edm4hep(args):
@@ -155,13 +156,13 @@ def compare(args):
     # Compare two ROOT histogram files
     compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
 
-    
+
 def build_parser():
     # Create the command-line parser and subcommands
     parser = ArgumentParser(description="Run a configurable EDM4hep analysis.")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    
-    # Convert command
+
+   # Convert command
     convert_parser = subparsers.add_parser(
         "convert",
         help="Convert EDM4hep to a reduced RNTuple"
@@ -173,7 +174,7 @@ def build_parser():
     convert_parser.add_argument("--output-file", default="output.root", type=str,
                         help="Output reduced RNTuple file")
     convert_parser.set_defaults(function=convert)
-    
+
     # EDM4hep histogram command
     edm4hep_parser = subparsers.add_parser(
         "histogram-edm4hep",
@@ -186,7 +187,7 @@ def build_parser():
     edm4hep_parser.add_argument("--output-file", required=True, type=str,
                                 help="Output histogram file")
     edm4hep_parser.set_defaults(function=histogram_edm4hep)
-    
+
     # RNTuple histogram command
     rntuple_parser = subparsers.add_parser(
         "histogram-rntuple",
@@ -197,7 +198,7 @@ def build_parser():
     rntuple_parser.add_argument("--output-file", required=True, type=str,
                                 help="Output histogram file")
     rntuple_parser.set_defaults(function=histogram_rntuple)
-    
+
     # Comparison command
     compare_parser = subparsers.add_parser(
         "compare",
