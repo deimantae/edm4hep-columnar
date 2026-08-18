@@ -42,8 +42,9 @@ def open_edm4hep(input_file):
         schemaclass=FCC.get_schema(version="edm4hep1"),
         mode="eager",
     #    iteritems_options={"filter_name": "/^(?!.*(PARAMETERS|_.*Map))/"},
+    # Temporary: Coffea EDM4hep schema does not yet support podio::LinkData
         iteritems_options={"filter_name": "/^(?!.*(PARAMETERS|_.*Map|RecoMCLink)).*$/"},
-        entry_stop=100,
+        entry_stop=100, #TODO
     ).events()
 
 
@@ -51,7 +52,7 @@ def configure_analysis(input_file, parameters_file):
     # Load and apply optional additional fields and/or event selection
     selection, additional_fields, variables = (
         load_configuration(parameters_file)
-        )
+    )
 
     events = open_edm4hep(input_file)
 
@@ -121,7 +122,7 @@ def convert(args):
     rntuple_array = ak.zip(selected_variables, depth_limit=1)
 
     with uproot.recreate(args.output_file) as output_file:
-        output_file.mkrntuple("Events", rntuple_array)
+        output_file.mkrntuple("events", rntuple_array)
 
     print(f"Saved RNTuple to {args.output_file}")
 
@@ -140,7 +141,7 @@ def histogram_edm4hep(args):
 def histogram_rntuple(args):
     # Open the reduced RNTuple
     with uproot.open(args.input_file) as input_file:
-        arrays = input_file["Events"].arrays()
+        arrays = input_file["events"].arrays()
 
     # Convert the Awkward array to a dictionary
     variables = {}
@@ -162,7 +163,7 @@ def build_parser():
     parser = ArgumentParser(description="Run a configurable EDM4hep analysis.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-   # Convert command
+    # Convert command
     convert_parser = subparsers.add_parser(
         "convert",
         help="Convert EDM4hep to a reduced RNTuple"
@@ -214,6 +215,13 @@ def build_parser():
     return parser
 
 
-parser = build_parser()
-args = parser.parse_args()
-args.function(args)
+# Run the CLI only when the script is executed directly
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    args.function(args)
+
+
+# Allow the functions to be imported without running the CLI
+if __name__ == "__main__":
+    main()

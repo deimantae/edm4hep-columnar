@@ -240,6 +240,13 @@ def build_parser():
     return parser
 
 
-parser = build_parser()
-args = parser.parse_args()
-args.function(args)
+# Run the CLI only when the script is executed directly
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    args.function(args)
+
+
+# Allow the functions to be imported without running the CLI
+if __name__ == "__main__":
+    main()
