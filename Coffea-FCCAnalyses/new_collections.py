@@ -48,7 +48,7 @@ def track_information(particles):
 def muon_isolation(muons, events, dr_min=0.01, dr_max=0.5):
     particles = events.ReconstructedParticles
 
-   # Add a new axis to compare every muon with every reconstructed particle
+    # Add a new axis to compare every muon with every reconstructed particle
     muon_eta = eta(muons)[:, :, None]
     muon_phi = phi(muons)[:, :, None]
     muon_p = p(muons)
@@ -76,11 +76,19 @@ def muon_isolation(muons, events, dr_min=0.01, dr_max=0.5):
 
 
 def particle_collections(events):
-    muons = events.ReconstructedParticles[events.Muon_objIdx.index]
-    electrons = events.ReconstructedParticles[events.Electron_objIdx.index]
-    photons = events.ReconstructedParticles[events.Photon_objIdx.index]
+    # Get reconstructed particles
+    particles = events.ReconstructedParticles
 
-    # Retrieve the track state information for charged particles
+    # Get indices for selected particles
+    muon_indices = events.Muon_objIdx.index
+    electron_indices = events.Electron_objIdx.index
+    photon_indices = events.Photon_objIdx.index
+
+    muons = particles[muon_indices]
+    electrons = particles[electron_indices]
+    photons = particles[photon_indices]
+
+    # Retrieve track states for selected particles
     muon_track_states = track_information(muons)
     electron_track_states = track_information(electrons)
 
@@ -113,6 +121,7 @@ def particle_collections(events):
         "Photon": photons,
     }
 
+
 # Return missing energy vector, based on reco particles
 def missing_energy(events):
     particles = events.ReconstructedParticles
@@ -135,6 +144,7 @@ def missing_energy(events):
     return {
         "MissingEnergy": missing,
     }
+
 
 def event_information(events):
     return {

@@ -78,10 +78,9 @@ variables:
     - py
     - pz
     - pt: "np.sqrt(px*px + py*py)"
-    - energy
 
   EventInfo:
     - event
     - run
- #   - weight
+    - weight
     - nTrack

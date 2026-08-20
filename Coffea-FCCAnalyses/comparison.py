@@ -7,7 +7,8 @@ This script can be run directly or imported by edm4hep_columnar.py
 from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
-import ROOT
+import numpy as np
+import uproot
 
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -19,12 +20,17 @@ def compare_histograms(
 ):
 
     # Open histogram files
-    histograms_1 = ROOT.TFile.Open(histograms_1_path, "READ")
-    histograms_2 = ROOT.TFile.Open(histograms_2_path, "READ")
+    histograms_1 = uproot.open(histograms_1_path)
+    histograms_2 = uproot.open(histograms_2_path)
     print("Comparing histograms...\n")
 
     # Count different histograms for validation
     different = 0
+
+    # Get histogram names from both files
+    branches_1 = set(histograms_1.keys(cycle=False))
+    branches_2 = set(histograms_2.keys(cycle=False))
+    branches = sorted(branches_1 | branches_2) # combine names from both files
 
     # Plot style
     plt.rcParams.update({
@@ -36,41 +42,45 @@ def compare_histograms(
 
     # Compare histograms
     with PdfPages(output_file) as pdf:
-        for key in histograms_2.GetListOfKeys():
-            branch = key.GetName()
+        for branch in branches:
 
-            histogram_1 = histograms_1.Get(branch)
-            histogram_2 = histograms_2.Get(branch)
-
-            # Check if no histograms are missing from either file
-            if not histogram_1 or not histogram_2:
+            # Check if histograms are missing from either file
+            if branch not in branches_1 or branch not in branches_2:
                 print(f"{branch:.<30} missing")
                 different += 1
                 continue
 
-            bin_centers = []
-            values_1 = []
-            values_2 = []
+            histogram_1 = histograms_1[branch]
+            histogram_2 = histograms_2[branch]
 
-            for bin_index in range(1, histogram_1.GetNbinsX() + 1):
-                bin_centers.append(histogram_1.GetBinCenter(bin_index))
+            # Get bin contents and binning
+            bin_centers = histogram_1.axis().centers()
+            bin_edges_1 = histogram_1.axis().edges()
+            bin_edges_2 = histogram_2.axis().edges()
 
-                values_1.append(histogram_1.GetBinContent(bin_index))
-                values_2.append(histogram_2.GetBinContent(bin_index))
+            values_1 = histogram_1.values()
+            values_2 = histogram_2.values()
 
-            # Difference panel
-            difference = []
+            # Different binning cannot be compared bin by bin
+            if (
+                len(bin_edges_1) != len(bin_edges_2)
+                or not np.allclose(bin_edges_1, bin_edges_2)
+            ):
+                print(f"{branch:.<30} different binning")
+                different += 1
+                continue
 
-            for value_1, value_2 in zip(values_1, values_2):
-                difference.append(value_1 - value_2)
+            # Calculate bin-by-bin difference
+            difference = values_1 - values_2
 
             # Validation
-            if all(value == 0 for value in difference):
+            if np.all(difference == 0):
                 print(f"{branch:.<30} identical")
             else:
                 print(f"{branch:.<30} different")
                 different += 1
 
+            # Plot histogram comparison
             fig, (ax, ax_difference) = plt.subplots(
                 2,
                 1,
@@ -82,14 +92,11 @@ def compare_histograms(
                 },
             )
 
-            histogram_1_label = r"$h_1$"
-            histogram_2_label = r"$h_2$"
-
             ax.step(
                 bin_centers,
                 values_1,
                 where="mid",
-                label=histogram_1_label,
+                label=r"$h_1$",
                 color="navy",
                 linewidth=1.5
             )
@@ -98,7 +105,7 @@ def compare_histograms(
                 bin_centers,
                 values_2,
                 where="mid",
-                label=histogram_2_label,
+                label=r"$h_2$",
                 color="lightsteelblue",
                 linewidth=1.5,
                 linestyle="--"
@@ -166,7 +173,7 @@ def compare_histograms(
             pdf.savefig(fig)
             plt.close(fig)
 
-    number_histograms = histograms_2.GetListOfKeys().GetSize()
+    number_histograms = len(branches)
 
     if different == 0:
         print(
@@ -179,8 +186,8 @@ def compare_histograms(
             "histograms differ."
         )
 
-    histograms_1.Close()
-    histograms_2.Close()
+    histograms_1.close()
+    histograms_2.close()
 
     print(f"Saved comparison to {output_file}")
 
@@ -189,11 +196,18 @@ def main():
     parser = ArgumentParser(description="Compare two ROOT histogram files")
     parser.add_argument("histograms_1", help="First histogram file")
     parser.add_argument("histograms_2", help="Second histogram file")
-    parser.add_argument("--output-file", default="histogram_comparison.pdf",
-                        help="Output PDF file")
+    parser.add_argument(
+        "--output-file",
+        default="histogram_comparison.pdf",
+        help="Output PDF file"
+    )
 
     args = parser.parse_args()
-    compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
+    compare_histograms(
+        args.histograms_1,
+        args.histograms_2,
+        args.output_file
+    )
 
 
 # Allow this file to be imported by edm4hep_columnar.py

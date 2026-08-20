@@ -7,11 +7,11 @@ import sys
 from argparse import ArgumentParser
 
 import awkward as ak
-import ROOT
 import uproot
 import yaml
 
 from coffea.nanoevents import FCC, NanoEventsFactory
+from hist import Hist
 
 from analysis_helpers import add_fields, apply_selection, collect_variables
 from comparison import compare_histograms
@@ -40,11 +40,12 @@ def open_edm4hep(input_file):
     return NanoEventsFactory.from_root(
         {input_file: "events"},
         schemaclass=FCC.get_schema(version="edm4hep1"),
-        mode="eager",
-    #    iteritems_options={"filter_name": "/^(?!.*(PARAMETERS|_.*Map))/"},
-    # Temporary: Coffea EDM4hep schema does not yet support podio::LinkData
-        iteritems_options={"filter_name": "/^(?!.*(PARAMETERS|_.*Map|RecoMCLink)).*$/"},
-        entry_stop=100, #TODO
+        mode="virtual",
+        # Coffea EDM4hep schema does not yet support podio::LinkData
+        iteritems_options={
+            "filter_name": "/^(?!.*(PARAMETERS|_.*Map|RecoMCLink)).*$/"
+        },
+        #entry_stop=100, #TODO
     ).events()
 
 
@@ -78,34 +79,54 @@ def configure_analysis(input_file, parameters_file):
     return selected_variables
 
 
+def get_histogram_range(values):
+    minimum = ak.min(values, axis=None)
+    maximum = ak.max(values, axis=None)
+
+    # Skip empty variables
+    if minimum is None or maximum is None:
+        return None
+
+    minimum = float(minimum)
+    maximum = float(maximum)
+
+    if minimum == maximum:
+        return minimum - 0.5, maximum + 0.5
+
+    # Add a small margin
+    difference = maximum - minimum
+    margin = 0.01
+    minimum -= margin * difference
+    maximum += margin * difference
+
+    return minimum, maximum
+
+
 def create_histograms(variables):
-    # Create ROOT histogram objects from the filtered dictionary of arrays
+    # Histogram the filtered variables
     histograms = {}
 
-    # Flatten Awkward arrays first
     for variable_name, values in variables.items():
-        values = ak.ravel(values)
-        # Skip empty variables
-        if len(values) == 0:
+        histogram_range = get_histogram_range(values)
+
+        if histogram_range is None:
             continue
 
-        values = ak.to_numpy(values)
-        histogram = ROOT.TH1D(variable_name, "", 100, 0, 0)
+        minimum, maximum = histogram_range
 
-        for value in values:
-            histogram.Fill(value)
+        # Create, fill and store the histogram
+        histogram = Hist.new.Reg(100, minimum, maximum).Double()
+        histogram.fill_flattened(values)
         histograms[variable_name] = histogram
 
     return histograms
 
 
 def write_histograms(histograms, output_file):
-    # Write ROOT histogram objects
-    root_file = ROOT.TFile(output_file, "RECREATE")
-
-    for histogram in histograms.values():
-        histogram.Write()
-    root_file.Close()
+    # Write histogram objects to a ROOT file
+    with uproot.recreate(output_file) as root_file:
+        for variable_name, histogram in histograms.items():
+            root_file[variable_name] = histogram
 
     print(f"Saved histogram objects to {output_file}")
 
@@ -117,7 +138,7 @@ def convert(args):
     selected_variables = configure_analysis(
         args.input_file,
         args.parameters_file
-        )
+    )
 
     rntuple_array = ak.zip(selected_variables, depth_limit=1)
 
@@ -193,7 +214,7 @@ def build_parser():
     rntuple_parser = subparsers.add_parser(
         "histogram-rntuple",
         help="Create histograms from the reduced RNTuple file"
-        )
+    )
     rntuple_parser.add_argument("--input-file", required=True, type=str,
                                 help="Input reduced RNTuple file")
     rntuple_parser.add_argument("--output-file", required=True, type=str,
