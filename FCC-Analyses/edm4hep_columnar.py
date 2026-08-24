@@ -16,23 +16,24 @@ from comparison import compare_histograms
 # Adapted from FCCAnalyses/examples/data_source/standalone.py
 
 ROOT.gSystem.Load("libFCCAnalyses")
+
 ROOT.gInterpreter.Declare("""
 #include "edm4hep/EventHeaderCollection.h"
 #include "edm4hep/TrackCollection.h"
 """)
 
+# Load FCCAnalyses dictionaries
 if ROOT.dummyLoader:
-    print("----> DEBUG: Found FCCAnalyses library.")
-    ROOT.gInterpreter.Declare("using namespace FCCAnalyses::PodioSource;")
+    ROOT.gInterpreter.Declare(
+        "using namespace FCCAnalyses::PodioSource;"
+    )
 
 functions_header = Path(__file__).resolve().parent / "functions.h"
 ROOT.gInterpreter.Declare(f'#include "{functions_header}"')
 
-print("----> INFO: Loading analyzers from libFCCAnalyses...")
 
 # Load podio DataSource
-if ROOT.podio.DataSource:
-    print("----> DEBUG: Found Podio ROOT DataSource.")
+_ = ROOT.podio.DataSource
 
 
 def load_configuration(parameters_file):
@@ -57,17 +58,14 @@ def open_edm4hep(input_file):
     # Open the EDM4hep ROOT file using podio::DataSource
     input_list = [input_file]
 
-    print("----> INFO: Loading events through podio::DataSource...")
-
     try:
         dframe = ROOT.podio.CreateDataFrame(input_list)
     except TypeError as excp:
-        print("----> ERROR: Unable to build dataframe!")
+        print("ERROR: Unable to build dataframe")
         print(excp)
         raise
 
-    # TODO: Remove temporary event limit after debugging
-    return dframe.Range(100)
+    return dframe
 
 
 def configure_analysis(input_file, parameters_file):
@@ -81,7 +79,7 @@ def configure_analysis(input_file, parameters_file):
     try:
         # Add user-defined fields to the dataframe
         dframe = add_fields(dframe, additional_fields)
-        
+
         # Apply the event selection
         dframe = apply_selection(dframe, selection)
 
@@ -103,7 +101,7 @@ def configure_analysis(input_file, parameters_file):
 def create_histograms(dframe, branches):
     # Create ROOT histogram objects
     histograms = []
-    
+
     for branch_name in branches:
         branch_name = str(branch_name)
 
@@ -164,7 +162,7 @@ def histogram_edm4hep(args):
         args.input_file,
         args.parameters_file
     )
-    
+
     histograms = create_histograms(dframe, branches)
     write_histograms(histograms, args.output_file)
 
@@ -173,7 +171,7 @@ def histogram_rntuple(args):
     # Create histograms from the reduced RNTuple
     dframe = ROOT.RDataFrame("events", args.input_file)
     branches = dframe.GetColumnNames()
-    
+
     histograms = create_histograms(dframe, branches)
     write_histograms(histograms, args.output_file)
 
@@ -213,7 +211,7 @@ def build_parser():
     edm4hep_parser.add_argument("--output-file", required=True, type=str,
                                 help="Output histogram file")
     edm4hep_parser.set_defaults(function=histogram_edm4hep)
-    
+
     # RNTuple histogram command
     rntuple_parser = subparsers.add_parser(
         "histogram-rntuple",
@@ -224,7 +222,7 @@ def build_parser():
     rntuple_parser.add_argument("--output-file", required=True, type=str,
                                 help="Output histogram file")
     rntuple_parser.set_defaults(function=histogram_rntuple)
-    
+
     # Comparison command
     compare_parser = subparsers.add_parser(
         "compare",
