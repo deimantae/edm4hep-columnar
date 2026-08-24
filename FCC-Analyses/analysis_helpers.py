@@ -36,8 +36,8 @@ def resolve_function(collection_name, function_name):
         f"Function '{function_name}' was not found for "
         f"collection '{collection_name}'."
     )
-    
-    
+
+
 def apply_selection(dframe, selection):
     if selection is None:
         return dframe
@@ -100,25 +100,25 @@ def collect_variables(dframe, variables):
                     "Invalid variable definition in the YAML file: "
                     f"expected 'name: function/expression', got {variable!r}."
                 )
-                
+
             variable_name, value = next(iter(variable.items()))
-            
+
             if not isinstance(value, str):
                 raise TypeError(
                     "Invalid variable definition in the YAML file: "
                     f"expected a string, got {value!r}."
                 )
-                
+
             # Simple function name, e.g. pt: getPt
             if value.isidentifier():
                 expression = resolve_function(collection_name, value)
-            
+
             # Full C++ expression
             else:
                 expression = value
-                    
+
             output_name = f"{collection_name}_{variable_name}"
-                
+
             dframe = dframe.Define(output_name, expression)
             branches.append(output_name)
 

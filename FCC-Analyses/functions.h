@@ -19,7 +19,7 @@ ROOT::VecOps::RVec<float>
 getPx(const edm4hep::ReconstructedParticleCollection &inColl) {
     ROOT::VecOps::RVec<float> result;
     result.reserve(inColl.size());
-    
+
     for (const auto &particle : inColl) {
         result.push_back(
             particle.getMomentum().x
@@ -34,7 +34,7 @@ ROOT::VecOps::RVec<float>
 getPy(const edm4hep::ReconstructedParticleCollection &inColl) {
     ROOT::VecOps::RVec<float> result;
     result.reserve(inColl.size());
-    
+
     for (const auto &particle : inColl) {
         result.push_back(
             particle.getMomentum().y
@@ -49,7 +49,7 @@ ROOT::VecOps::RVec<float>
 getPz(const edm4hep::ReconstructedParticleCollection &inColl) {
     ROOT::VecOps::RVec<float> result;
     result.reserve(inColl.size());
-    
+
     for (const auto &particle : inColl) {
         result.push_back(
             particle.getMomentum().z
@@ -64,7 +64,7 @@ ROOT::VecOps::RVec<float>
 getTheta(const edm4hep::ReconstructedParticleCollection &inColl) {
     ROOT::VecOps::RVec<float> result;
     result.reserve(inColl.size());
-    
+
     for (const auto &particle : inColl) {
         const auto momentum = particle.getMomentum();
         result.push_back(
@@ -83,7 +83,7 @@ ROOT::VecOps::RVec<float>
 getPhi(const edm4hep::ReconstructedParticleCollection &inColl) {
     ROOT::VecOps::RVec<float> result;
     result.reserve(inColl.size());
-    
+
     for (const auto &particle : inColl) {
         const auto momentum = particle.getMomentum();
         result.push_back(
@@ -208,7 +208,7 @@ getZ0(const edm4hep::ReconstructedParticleCollection &inColl) {
         }
         result.push_back(trackStates[0].Z0);
     }
-    
+
     return result;
 }
 
