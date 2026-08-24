@@ -45,7 +45,7 @@ def track_information(particles):
     return states
 
 
-def muon_isolation(muons, events, dr_min=0.01, dr_max=0.5):
+def calculate_muon_isolation(muons, events, dr_min=0.01, dr_max=0.5):
     particles = events.ReconstructedParticles
 
     # Add a new axis to compare every muon with every reconstructed particle
@@ -84,16 +84,26 @@ def particle_collections(events):
     electron_indices = events.Electron_objIdx.index
     photon_indices = events.Photon_objIdx.index
 
+    # Create selected particle collections
     muons = particles[muon_indices]
     electrons = particles[electron_indices]
     photons = particles[photon_indices]
 
+    return {
+        "Muon": muons,
+        "Electron": electrons,
+        "Photon": photons,
+    }
+
+
+def particle_track_information(events):
+    # Get previously created particle collections
+    muons = events.Muon
+    electrons = events.Electron
+
     # Retrieve track states for selected particles
     muon_track_states = track_information(muons)
     electron_track_states = track_information(electrons)
-
-    # Add the relative cone isolation
-    muons = ak.with_field(muons, muon_isolation(muons, events), "isolation")
 
     # Add transverse and longitudinal impact parameters
     muons = ak.with_field(muons, muon_track_states.D0, "d0")
@@ -118,8 +128,20 @@ def particle_collections(events):
     return {
         "Muon": muons,
         "Electron": electrons,
-        "Photon": photons,
     }
+
+
+def muon_isolation(events):
+    # Get previously created muon collection
+    muons = events.Muon
+
+    # Add the relative cone isolation
+    muons = ak.with_field(muons, calculate_muon_isolation(muons, events),
+                          "isolation")
+
+    return {
+        "Muon": muons,
+}
 
 
 # Return missing energy vector, based on reco particles
