@@ -6,6 +6,7 @@ This script can be run directly or imported by edm4hep_columnar.py
 
 from argparse import ArgumentParser
 
+import math
 import matplotlib.pyplot as plt
 import ROOT
 
@@ -22,9 +23,14 @@ def compare_histograms(
     histograms_1 = ROOT.TFile.Open(histograms_1_path, "READ")
     histograms_2 = ROOT.TFile.Open(histograms_2_path, "READ")
     print("Comparing histograms...\n")
-    
+
     # Count different histograms for validation
     different = 0
+
+    # Get histogram names from both files
+    branches_1 = {key.GetName() for key in histograms_1.GetListOfKeys()}
+    branches_2 = {key.GetName() for key in histograms_2.GetListOfKeys()}
+    branches = sorted(branches_1 | branches_2)
 
     # Plot style
     plt.rcParams.update({
@@ -36,25 +42,46 @@ def compare_histograms(
 
     # Compare histograms
     with PdfPages(output_file) as pdf:
-        for key in histograms_2.GetListOfKeys():
-            branch = key.GetName()
-
-            histogram_1 = histograms_1.Get(branch)
-            histogram_2 = histograms_2.Get(branch)
+        for branch in branches:
 
             # Check if no histograms are missing from either file
-            if not histogram_1 or not histogram_2:
+            if branch not in branches_1 or branch not in branches_2:
                 print(f"{branch:.<30} missing")
                 different += 1
                 continue
 
+            histogram_1 = histograms_1.Get(branch)
+            histogram_2 = histograms_2.Get(branch)
+
+            # Check that the histograms have the same binning
+            same_binning = (
+                histogram_1.GetNbinsX() == histogram_2.GetNbinsX()
+                and math.isclose(
+                    histogram_1.GetXaxis().GetXmin(),
+                    histogram_2.GetXaxis().GetXmin(),
+                    rel_tol=1e-5,
+                    abs_tol=1e-8,
+                )
+                and math.isclose(
+                    histogram_1.GetXaxis().GetXmax(),
+                    histogram_2.GetXaxis().GetXmax(),
+                    rel_tol=1e-5,
+                    abs_tol=1e-8,
+                )
+            )
+
+            if not same_binning:
+                print(f"{branch:.<30} different binning")
+                different += 1
+                continue
+
+            # Get bin centers and contents
             bin_centers = []
             values_1 = []
             values_2 = []
 
             for bin_index in range(1, histogram_1.GetNbinsX() + 1):
                 bin_centers.append(histogram_1.GetBinCenter(bin_index))
-
                 values_1.append(histogram_1.GetBinContent(bin_index))
                 values_2.append(histogram_2.GetBinContent(bin_index))
 
@@ -63,9 +90,11 @@ def compare_histograms(
 
             for value_1, value_2 in zip(values_1, values_2):
                 difference.append(value_1 - value_2)
-            
+
             # Validation
-            if all(value == 0 for value in difference):
+            # Allow one entry bin shifts caused by float32 rounding differences
+            # when comparing Coffea and FCCAnalyses
+            if all(abs(value) <= 1 for value in difference):
                 print(f"{branch:.<30} identical")
             else:
                 print(f"{branch:.<30} different")
@@ -134,7 +163,7 @@ def compare_histograms(
             # Center axis labels
             ax.yaxis.set_label_coords(-0.13, 0.5)
             ax_difference.yaxis.set_label_coords(-0.13, 0.5)
-            
+
             # More space for y axis labels
             fig.subplots_adjust(left=0.18)
 
@@ -166,7 +195,7 @@ def compare_histograms(
             pdf.savefig(fig)
             plt.close(fig)
 
-    number_histograms = histograms_2.GetListOfKeys().GetSize()
+    number_histograms = len(branches)
 
     if different == 0:
         print(
@@ -178,10 +207,10 @@ def compare_histograms(
             f"\nValidation failed: {different} of {number_histograms} "
             "histograms differ."
         )
-    
+
     histograms_1.Close()
     histograms_2.Close()
-    
+
     print(f"Saved comparison to {output_file}")
 
 
@@ -191,7 +220,7 @@ def main():
     parser.add_argument("histograms_2", help="Second histogram file")
     parser.add_argument("--output-file", default="histogram_comparison.pdf",
                         help="Output PDF file")
-    
+
     args = parser.parse_args()
     compare_histograms(args.histograms_1, args.histograms_2, args.output_file)
 

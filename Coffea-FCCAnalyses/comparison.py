@@ -16,7 +16,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 def compare_histograms(
     histograms_1_path,
     histograms_2_path,
-    output_file="histogram_comparison.pdf",
+    output_file="histogram_comparison.pdf"
 ):
 
     # Open histogram files
@@ -37,7 +37,7 @@ def compare_histograms(
         "font.family": "serif",
         "font.serif": ["Times New Roman", "DejaVu Serif"],
         "font.size": 14,
-        "mathtext.fontset": "stix",
+        "mathtext.fontset": "stix"
     })
 
     # Compare histograms
@@ -74,7 +74,9 @@ def compare_histograms(
             difference = values_1 - values_2
 
             # Validation
-            if np.all(difference == 0):
+            # Allow one entry bin shifts caused by float32 rounding differences
+            # when comparing Coffea and FCCAnalyses
+            if np.allclose(values_1, values_2, rtol=0, atol=1):
                 print(f"{branch:.<30} identical")
             else:
                 print(f"{branch:.<30} different")
