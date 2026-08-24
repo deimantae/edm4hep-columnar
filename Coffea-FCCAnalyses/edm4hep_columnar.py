@@ -14,6 +14,7 @@ from coffea.nanoevents import FCC, NanoEventsFactory
 from hist import Hist
 
 from analysis_helpers import add_fields, apply_selection, collect_variables
+from autobins import autobin_range
 from comparison import compare_histograms
 
 
@@ -44,7 +45,7 @@ def open_edm4hep(input_file):
         # Coffea EDM4hep schema does not yet support podio::LinkData
         iteritems_options={
             "filter_name": "/^(?!.*(PARAMETERS|_.*Map|RecoMCLink)).*$/"
-        },
+        }
         #entry_stop=100, #TODO
     ).events()
 
@@ -79,39 +80,17 @@ def configure_analysis(input_file, parameters_file):
     return selected_variables
 
 
-def get_histogram_range(values):
-    minimum = ak.min(values, axis=None)
-    maximum = ak.max(values, axis=None)
-
-    # Skip empty variables
-    if minimum is None or maximum is None:
-        return None
-
-    minimum = float(minimum)
-    maximum = float(maximum)
-
-    if minimum == maximum:
-        return minimum - 0.5, maximum + 0.5
-
-    # Add a small margin
-    difference = maximum - minimum
-    margin = 0.01
-    minimum -= margin * difference
-    maximum += margin * difference
-
-    return minimum, maximum
-
-
 def create_histograms(variables):
     # Histogram the filtered variables
     histograms = {}
 
     for variable_name, values in variables.items():
-        histogram_range = get_histogram_range(values)
+        # Determine auto histogram range, equivalent to ROOT
+        histogram_range = autobin_range(values)
 
+        # Skip empty variables
         if histogram_range is None:
             continue
-
         minimum, maximum = histogram_range
 
         # Create, fill and store the histogram
