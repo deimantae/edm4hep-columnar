@@ -9,7 +9,9 @@ from pathlib import Path
 
 import ROOT
 
-from analysis_helpers import add_fields, apply_selection, collect_variables
+from analysis_helpers import (
+    add_fields, apply_selection, collect_variables, print_summary
+)
 from comparison import compare_histograms
 
 # Load FCCAnalyses
@@ -65,16 +67,25 @@ def open_edm4hep(input_file):
         print(excp)
         raise
 
+    # TODO: Remove temporary event limit after debugging
     return dframe
+    #return dframe.Range(100)
 
 
-def configure_analysis(input_file, parameters_file):
+def configure_analysis(input_file, parameters_file, count_events=False):
     # Load and apply optional additional fields and/or event selection
     selection, additional_fields, variables = (
         load_configuration(parameters_file)
     )
 
     dframe = open_edm4hep(input_file)
+
+    # Count events before selection if required
+    input_event_count = None
+    selected_event_count = None
+
+    if count_events:
+        input_event_count = dframe.Count()
 
     try:
         # Add user-defined fields to the dataframe
@@ -87,6 +98,10 @@ def configure_analysis(input_file, parameters_file):
         print(f"Configuration error: {error}")
         sys.exit(1)
 
+    # Count events after selection if required
+    if count_events:
+        selected_event_count = dframe.Count()
+
     try:
         # Collect all indicated variables
         dframe, branches = collect_variables(dframe, variables)
@@ -95,7 +110,7 @@ def configure_analysis(input_file, parameters_file):
         print(f"Configuration error: {error}")
         sys.exit(1)
 
-    return dframe, branches
+    return dframe, branches, input_event_count, selected_event_count
 
 
 def create_histograms(dframe, branches):
@@ -133,17 +148,18 @@ def write_histograms(histograms, output_file):
 
 def convert(args):
     # Configure the EDM4hep analysis
-    dframe, branches = configure_analysis(
-        args.input_file,
-        args.parameters_file
+    dframe, branches, input_event_count, selected_event_count = (
+        configure_analysis(
+            args.input_file,
+            args.parameters_file,
+            count_events=True
+        )
     )
 
     # Configure Snapshot to write an RNTuple
     snapshot_options = ROOT.RDF.RSnapshotOptions()
 
-    snapshot_options.fOutputFormat = (
-        ROOT.RDF.ESnapshotOutputFormat.kRNTuple
-    )
+    snapshot_options.fOutputFormat = (ROOT.RDF.ESnapshotOutputFormat.kRNTuple)
 
     # Write reduced RNTuple
     dframe.Snapshot(
@@ -153,14 +169,20 @@ def convert(args):
         snapshot_options,
     )
 
+    # Print reduction summary
+    print_summary(
+        input_event_count.GetValue(),
+        selected_event_count.GetValue(),
+        len(branches)
+    )
+
     print(f"Saved reduced RNTuple to {args.output_file}")
 
 
 def histogram_edm4hep(args):
     # Create histograms directly from the EDM4hep file
-    dframe, branches = configure_analysis(
-        args.input_file,
-        args.parameters_file
+    dframe, branches, input_event_count, selected_event_count = (
+        configure_analysis(args.input_file, args.parameters_file)
     )
 
     histograms = create_histograms(dframe, branches)

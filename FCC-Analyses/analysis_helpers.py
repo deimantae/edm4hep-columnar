@@ -123,3 +123,19 @@ def collect_variables(dframe, variables):
             branches.append(output_name)
 
     return dframe, branches
+
+
+def print_summary(input_events, selected_events, output_variables):
+    input_events = int(input_events)
+    selected_events = int(selected_events)
+
+    selection_rate = 0
+    if input_events > 0:
+        selection_rate = 100 * selected_events / input_events
+
+    print(" REDUCTION SUMMARY ".center(80, "="))
+    print(f"{'Input events:':<40}{input_events:>40,}")
+    print(f"{'Selected events:':<40}{selected_events:>40,}")
+    print(f"{'Selection rate:':<40}{selection_rate:>39.2f}%")
+    print(f"{'Output variables:':<40}{output_variables:>40}")
+    print("=" * 80)
