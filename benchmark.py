@@ -15,6 +15,7 @@ import tempfile
 import time
 from contextlib import redirect_stdout
 from pathlib import Path
+from prettytable import PrettyTable
 
 
 DIR = Path(__file__).resolve().parent
@@ -26,15 +27,15 @@ WORKFLOWS = {
 
 
 # Run one workflow command and measure its execution time
-def time_command(function, arguments):    
+def time_command(function, arguments):
     start = time.perf_counter_ns()
-    
+
     # Hide output of the commands
     with redirect_stdout(io.StringIO()):
         function(arguments)
-        
+
     elapsed = time.perf_counter_ns() - start
-    
+
     return elapsed / 1e9 # convert ns to s
 
 
@@ -88,7 +89,7 @@ def format_time(values):
     mean = statistics.mean(values)
     sigma = statistics.stdev(values)
 
-    return f"{mean:.3f} ± {sigma:.3f} s"
+    return f"{mean:.3f} ± {sigma:.3f}"
 
 
 def main():
@@ -101,7 +102,7 @@ def main():
     # Original EDM4hep input file
     parser.add_argument("input_file", type=Path)
     # Number of measured runs after the warm-up
-    parser.add_argument("--runs", type=int, default=5, help="Number of runs")
+    parser.add_argument("--runs", type=int, default=10, help="Number of runs")
     args = parser.parse_args()
 
     # At least two measurements required for std
@@ -131,8 +132,7 @@ def main():
     # Create a temporary directory for reduced files and histograms
     # Deleted when the benchmark finishes
     with tempfile.TemporaryDirectory(
-        prefix="edm4hep-benchmark-",
-        dir=DIR
+        prefix="edm4hep-benchmark-"
     ) as temporary_directory:
 
         output_dir = Path(temporary_directory)
@@ -156,30 +156,58 @@ def main():
         workflow_name = "FCCAnalyses"
     else:
         workflow_name = "Coffea"
-    
+
     print(
         f"\n{workflow_name} benchmark results\n"
-        f"(mean ± sigma, {args.runs} measured runs)\n"
-    )
-    
-    print("EDM4hep")
-    print(
-        "  histogramming:            "
-        f"{format_time(results['histogram-edm4hep'])}"
-    )
-    
-    print("\nReduced RNTuple")
-    print(
-        "  conversion:               "
-        f"{format_time(results['conversion'])}"
-    )
-    print(
-        "  histogramming:            "
-        f"{format_time(results['histogram-rntuple'])}"
-    )
-    print(
-        "  total:                    "
-        f"{format_time(results['total'])}"
+        f"({args.runs} measured runs)\n"
     )
 
-main()
+    # EDM4hep results
+    print("EDM4hep")
+
+    edm4hep_table = PrettyTable()
+    edm4hep_table.field_names = ["Attempt", "Histogramming [s]"]
+
+    for run in range(args.runs):
+        edm4hep_table.add_row([
+            run + 1,
+            f"{results['histogram-edm4hep'][run]:.3f}"
+        ])
+
+    edm4hep_table.add_row([
+        "Mean",
+        format_time(results["histogram-edm4hep"])
+    ])
+
+    print(edm4hep_table)
+
+    # Reduced RNTuple results
+    print("\nReduced RNTuple")
+
+    rntuple_table = PrettyTable()
+    rntuple_table.field_names = [
+        "Attempt",
+        "Conversion [s]",
+        "Histogramming [s]",
+        "Total [s]"
+    ]
+
+    for run in range(args.runs):
+        rntuple_table.add_row([
+            run + 1,
+            f"{results['conversion'][run]:.3f}",
+            f"{results['histogram-rntuple'][run]:.3f}",
+            f"{results['total'][run]:.3f}"
+        ])
+
+    rntuple_table.add_row([
+        "Mean",
+        format_time(results["conversion"]),
+        format_time(results["histogram-rntuple"]),
+        format_time(results["total"])
+    ])
+
+    print(rntuple_table)
+
+if __name__ == "__main__":
+    main()
