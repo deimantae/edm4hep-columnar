@@ -72,7 +72,6 @@ variables:
     - py: getPy
     - pz: getPz
     - pt: getPt
-    - energy: getE
 
   EventInfo:
     - event: "EventHeader.eventNumber()[0]"
