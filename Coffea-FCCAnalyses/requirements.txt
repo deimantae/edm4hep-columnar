@@ -1,0 +1,8 @@
+awkward
+coffea
+hist
+matplotlib
+numpy
+prettytable
+pyyaml
+uproot
