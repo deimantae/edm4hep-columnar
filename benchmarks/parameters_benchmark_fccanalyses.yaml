@@ -1,0 +1,73 @@
+selection: null
+
+additional_fields:
+  ECM: "EDM4hepColumnar::getEnergy(Particle)[0] + EDM4hepColumnar::getEnergy(Particle)[1]"
+  MissingEnergy: "EDM4hepColumnar::getMissingEnergy(ECM, ReconstructedParticles)"
+
+variables:
+  Jet:
+    - px: getPx
+    - py: getPy
+    - pz: getPz
+    - pt: getPt
+    - p: getP
+    - theta: getTheta
+    - phi: getPhi
+    - energy: getE
+    - charge: getCharge
+
+  Muon:
+    - px: getPx
+    - py: getPy
+    - pz: getPz
+    - pt: getPt
+    - p: getP
+    - theta: getTheta
+    - phi: getPhi
+    - energy: getE
+    - charge: getCharge
+    - goodnessOfPID: getGoodnessOfPID
+    - d0: getD0
+    - z0: getZ0
+    - d0Error: getD0Error
+    - z0Error: getZ0Error
+    - isolation: "EDM4hepColumnar::getIsolation(Muon, ReconstructedParticles)"
+
+  Electron:
+    - px: getPx
+    - py: getPy
+    - pz: getPz
+    - pt: getPt
+    - p: getP
+    - theta: getTheta
+    - phi: getPhi
+    - energy: getE
+    - charge: getCharge
+    - goodnessOfPID: getGoodnessOfPID
+    - d0: getD0
+    - z0: getZ0
+    - d0Error: getD0Error
+    - z0Error: getZ0Error
+
+  Photon:
+    - px: getPx
+    - py: getPy
+    - pz: getPz
+    - pt: getPt
+    - p: getP
+    - theta: getTheta
+    - phi: getPhi
+    - energy: getE
+    - charge: getCharge
+
+  MissingEnergy:
+    - px: getPx
+    - py: getPy
+    - pz: getPz
+    - pt: getPt
+
+  EventInfo:
+    - event: "EventHeader.eventNumber()[0]"
+    - run: "EventHeader.runNumber()[0]"
+    - weight: "EventHeader.weight()[0]"
+    - nTrack: "EFlowTrack.size()"
