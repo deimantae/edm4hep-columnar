@@ -1,11 +1,11 @@
-selection: null
+selection:
   # Option 1: use a Python selection function
-#  script:
- #   file_name: event_selection.py
-  #  function: select_pt
+  script:
+    file_name: event_selection.py
+    function: select_jets
 
   # Option 2: use an inline Python filter expression
-  # filter: "ak.any(np.sqrt(Jet.px*Jet.px + Jet.py*Jet.py) > 90, axis=1)"
+  # filter: "ak.sum(Jet.energy > 10, axis=1) >= 2"
 
 additional_fields:
   - file_name: new_collections.py

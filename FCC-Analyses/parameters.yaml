@@ -1,11 +1,11 @@
-selection: null
+selection:
   # Option 1: use a Python selection function
-#  script:
- #   file_name: event_selection.py
-  #  function: select_pt
+  script:
+    file_name: event_selection.py
+    function: select_jets
 
   # Option 2: use an inline C++ filter expression
-  # filter: "ROOT::VecOps::Any(ReconstructedParticle::getPt(Jet) > 90)"
+  # filter: "ROOT::VecOps::Sum(ReconstructedParticle::getE(Jet) > 10) >= 2"
 
 additional_fields:
   ECM: "EDM4hepColumnar::getEnergy(Particle)[0] + EDM4hepColumnar::getEnergy(Particle)[1]"
