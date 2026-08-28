@@ -17,14 +17,18 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from prettytable import PrettyTable
 
-
-DIR = Path(__file__).resolve().parent
+BENCHMARK_DIR = Path(__file__).resolve().parent
+REPO_DIR = BENCHMARK_DIR.parent
 
 WORKFLOWS = {
-    "fccanalyses": DIR / "FCC-Analyses",
-    "coffea": DIR / "Coffea-FCCAnalyses"
+    "fccanalyses": REPO_DIR / "FCC-Analyses",
+    "coffea": REPO_DIR / "Coffea"
 }
 
+PARAMETERS = {
+    "fccanalyses": BENCHMARK_DIR / "parameters_benchmark_fccanalyses.yaml",
+    "coffea": BENCHMARK_DIR / "parameters_benchmark_coffea.yaml"
+}
 
 # Run one workflow command and measure its execution time
 def time_command(function, arguments):
@@ -40,9 +44,7 @@ def time_command(function, arguments):
 
 
 # Run all three benchmarked commands once
-def run_workflow(workflow, workflow_dir, input_file, output_dir):
-    parameters = workflow_dir / "parameters.yaml"
-
+def run_workflow(workflow, parameters, input_file, output_dir):
     # Temporary output files used by the workflow
     reduced_file = output_dir / "reduced.root"
     edm4hep_histograms = output_dir / "histograms_edm4hep.root"
@@ -114,6 +116,10 @@ def main():
     if not input_file.is_file():
         parser.error(f"Input file does not exist: {input_file}")
 
+    parameters = PARAMETERS[args.workflow]
+    if not parameters.is_file():
+        parser.error(f"Parameters file does not exist: {parameters}")
+
     workflow_dir = WORKFLOWS[args.workflow]
     os.chdir(workflow_dir) # run everything from the workflow dir
 
@@ -139,13 +145,13 @@ def main():
 
         # First run warms the caches and is not included in the statistics
         print("Warm-up")
-        run_workflow(workflow, workflow_dir, input_file, output_dir)
+        run_workflow(workflow, parameters, input_file, output_dir)
 
         # Perform the measured runs
         for run in range(args.runs):
             print(f"Run {run + 1}/{args.runs}")
 
-            times = run_workflow(workflow, workflow_dir, input_file, output_dir)
+            times = run_workflow(workflow, parameters, input_file, output_dir)
 
             # Add timings to result lists
             for name in results:

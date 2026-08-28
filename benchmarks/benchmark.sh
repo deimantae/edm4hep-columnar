@@ -3,7 +3,8 @@
 set -e  # stop after first error
 
 # Find repository directory
-REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+BENCHMARK_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_DIR=$(cd "${BENCHMARK_DIR}/.." && pwd)
 
 # Check command-line arguments
 if [ "$#" -ne 1 ]; then
@@ -28,7 +29,7 @@ echo "Running FCCAnalyses benchmark"
 (
     set --  # clean positional arguments
     source "${REPO_DIR}/FCC-Analyses/setup.sh"
-    python -u "${REPO_DIR}/benchmark.py" fccanalyses "$INPUT_FILE"
+    python -u "${BENCHMARK_DIR}/benchmark.py" fccanalyses "$INPUT_FILE"
 )
 
 # Run Coffea benchmark
@@ -37,8 +38,8 @@ echo "Running Coffea benchmark"
 
 (
     set --  # clean positional arguments
-    source "${REPO_DIR}/Coffea-FCCAnalyses/setup.sh"
-    python -u "${REPO_DIR}/benchmark.py" coffea "$INPUT_FILE"
+    source "${REPO_DIR}/Coffea/setup.sh"
+    python -u "${BENCHMARK_DIR}/benchmark.py" coffea "$INPUT_FILE"
 )
 
 echo
