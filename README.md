@@ -395,7 +395,7 @@ was used to estimate the startup time and processing time per event.
 
 ### 7.2 Results
 
-Across all tested CPUs, Coffea is consistently faster than FCCAnalyses, while histogramming from the reduced RNTuple is substantially faster than processing EDM4hep directly.
+Reduced RNTuple analysis significantly lowers processing cost after a one-time conversion. For both frameworks, conversion takes approximately as long as one direct EDM4hep histogramming pass. Making histograms from the full EDM4hep input file is ~25x (x50) slower than from the columnar RNTuple using FCCAnalyses (Coffea). Once converted, histogramming from the reduced RNTuple is much faster, making the reduced format increasingly advantageous when reused for repeated downstream analyses.
 
 <p align="center">
   <picture>
@@ -405,9 +405,7 @@ Across all tested CPUs, Coffea is consistently faster than FCCAnalyses, while hi
   </picture>
 </p>
 
-For both frameworks, conversion takes approximately as long as one direct EDM4hep histogramming pass. Across the tested CPUs, EDM4hep histogramming takes approximately 24–26 times longer than RNTuple histogramming with FCCAnalyses and 45–60 times longer with Coffea. Once converted, histogramming from the reduced RNTuple is much faster, making the reduced format increasingly advantageous when reused for repeated downstream analyses.
-
-The benchmark timings are dominated by I/O and data access rather than histogramming from the reduced columnar format itself. Accessing more complex EDM4hep variables can be expensive; for instance, loading `TrackState` information adds considerable additional processing time.
+Across the tested CPUs, RNTuple histogramming is ~4× faster with Coffea than with FCCAnalyses. The benchmark timings are dominated by I/O and data access rather than histogramming from the reduced columnar format itself. Accessing more complex EDM4hep variables can be expensive; for instance, loading `TrackState` information adds considerable additional processing time.
 
 The event-scaling measurements show approximately linear behaviour with event count. EDM4hep histogramming and conversion have similar per-event costs in each framework: 0.522 and 0.518 ms/event for FCCAnalyses, and 0.204 and 0.213 ms/event for Coffea. In contrast, RNTuple histogramming reduces the fitted per-event cost to approximately 0.012 ms/event for FCCAnalyses and 0.002 ms/event for Coffea.
 
