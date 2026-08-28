@@ -48,7 +48,6 @@ def open_edm4hep(input_file):
         iteritems_options={
             "filter_name": "/^(?!.*(PARAMETERS|_.*Map|RecoMCLink)).*$/"
         }
-        #entry_stop=100, #TODO
     ).events()
 
 

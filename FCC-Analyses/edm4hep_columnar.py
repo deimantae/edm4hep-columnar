@@ -67,9 +67,8 @@ def open_edm4hep(input_file):
         print(excp)
         raise
 
-    # TODO: Remove temporary event limit after debugging
+    # Add event limit with return dframe.Range(100)
     return dframe
-    #return dframe.Range(100)
 
 
 def configure_analysis(input_file, parameters_file, count_events=False):
